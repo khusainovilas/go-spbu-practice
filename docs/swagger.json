@@ -1,0 +1,240 @@
+{
+    "schemes": [
+        "http"
+    ],
+    "swagger": "2.0",
+    "info": {
+        "description": "HTTP and gRPC API over the external movie stand.\nHTTP: GET /load-movies, GET /last-movie. gRPC: MovieService/LoadMovies, MovieService/GetLastMovie.",
+        "title": "Movie Service API",
+        "contact": {},
+        "version": "1.0"
+    },
+    "basePath": "/",
+    "paths": {
+        "/healthz": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "system"
+                ],
+                "summary": "Health check",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/last-movie": {
+            "get": {
+                "description": "Finds the latest available movie on the stand. Movie ids are consecutive, so the service probes id 99999 and then uses binary search.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "movies"
+                ],
+                "summary": "Get the last movie",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/movie.Movie"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.ErrorResponse"
+                        }
+                    },
+                    "408": {
+                        "description": "Request Timeout",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.ErrorResponse"
+                        }
+                    },
+                    "502": {
+                        "description": "Bad Gateway",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.ErrorResponse"
+                        }
+                    },
+                    "504": {
+                        "description": "Gateway Timeout",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/load-movies": {
+            "get": {
+                "description": "Loads movies from the external stand for ids in [from; to]. If some movies fail, the response is 207 with the successfully loaded movies and failure details in the X-Failed-Ids and X-Partial-Errors headers.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "movies"
+                ],
+                "summary": "Load movies by id range",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "First movie id (must be \u003e 0)",
+                        "name": "from",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Last movie id (must be \u003e= from)",
+                        "name": "to",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/movie.Movie"
+                            }
+                        }
+                    },
+                    "207": {
+                        "description": "Partial success",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/movie.Movie"
+                            }
+                        },
+                        "headers": {
+                            "X-Failed-Ids": {
+                                "type": "string",
+                                "description": "Comma-separated ids that failed (up to 100)"
+                            },
+                            "X-Partial-Errors": {
+                                "type": "string",
+                                "description": "URL-encoded JSON array of {id, error} objects (up to 100)"
+                            },
+                            "X-Partial-Errors-Truncated": {
+                                "type": "string",
+                                "description": "true when headers contain only the first 100 failures"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "No movies found in the range",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.ErrorResponse"
+                        }
+                    },
+                    "408": {
+                        "description": "Request canceled",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.ErrorResponse"
+                        }
+                    },
+                    "502": {
+                        "description": "Movie stand error",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.ErrorResponse"
+                        }
+                    },
+                    "504": {
+                        "description": "Movie stand timeout",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "httpapi.ErrorResponse": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string",
+                    "example": "invalid_argument"
+                },
+                "details": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/httpapi.Failure"
+                    }
+                },
+                "error": {
+                    "type": "string",
+                    "example": "invalid from parameter"
+                }
+            }
+        },
+        "httpapi.Failure": {
+            "type": "object",
+            "properties": {
+                "error": {
+                    "type": "string",
+                    "example": "movie stand returned 500 Internal Server Error for movie 3"
+                },
+                "id": {
+                    "type": "integer",
+                    "example": 3
+                }
+            }
+        },
+        "movie.Movie": {
+            "type": "object",
+            "properties": {
+                "director": {
+                    "type": "string",
+                    "example": "John Lasseter"
+                },
+                "id": {
+                    "type": "integer",
+                    "example": 1
+                },
+                "title": {
+                    "type": "string",
+                    "example": "Toy Story"
+                },
+                "year": {
+                    "type": "string",
+                    "example": "1995"
+                }
+            }
+        }
+    }
+}

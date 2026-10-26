@@ -427,3 +427,11 @@ FodyWeavers.xsd
 *.msix
 *.msm
 *.msp
+
+# Go build artifacts
+/bin/
+*.exe
+*.test
+*.out
+coverage.out
+

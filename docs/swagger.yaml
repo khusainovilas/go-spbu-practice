@@ -1,0 +1,166 @@
+basePath: /
+definitions:
+  httpapi.ErrorResponse:
+    properties:
+      code:
+        example: invalid_argument
+        type: string
+      details:
+        items:
+          $ref: '#/definitions/httpapi.Failure'
+        type: array
+      error:
+        example: invalid from parameter
+        type: string
+    type: object
+  httpapi.Failure:
+    properties:
+      error:
+        example: movie stand returned 500 Internal Server Error for movie 3
+        type: string
+      id:
+        example: 3
+        type: integer
+    type: object
+  movie.Movie:
+    properties:
+      director:
+        example: John Lasseter
+        type: string
+      id:
+        example: 1
+        type: integer
+      title:
+        example: Toy Story
+        type: string
+      year:
+        example: "1995"
+        type: string
+    type: object
+info:
+  contact: {}
+  description: |-
+    HTTP and gRPC API over the external movie stand.
+    HTTP: GET /load-movies, GET /last-movie. gRPC: MovieService/LoadMovies, MovieService/GetLastMovie.
+  title: Movie Service API
+  version: "1.0"
+paths:
+  /healthz:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Health check
+      tags:
+      - system
+  /last-movie:
+    get:
+      description: Finds the latest available movie on the stand. Movie ids are consecutive,
+        so the service probes id 99999 and then uses binary search.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/movie.Movie'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpapi.ErrorResponse'
+        "408":
+          description: Request Timeout
+          schema:
+            $ref: '#/definitions/httpapi.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/httpapi.ErrorResponse'
+        "502":
+          description: Bad Gateway
+          schema:
+            $ref: '#/definitions/httpapi.ErrorResponse'
+        "504":
+          description: Gateway Timeout
+          schema:
+            $ref: '#/definitions/httpapi.ErrorResponse'
+      summary: Get the last movie
+      tags:
+      - movies
+  /load-movies:
+    get:
+      description: Loads movies from the external stand for ids in [from; to]. If
+        some movies fail, the response is 207 with the successfully loaded movies
+        and failure details in the X-Failed-Ids and X-Partial-Errors headers.
+      parameters:
+      - description: First movie id (must be > 0)
+        in: query
+        name: from
+        required: true
+        type: integer
+      - description: Last movie id (must be >= from)
+        in: query
+        name: to
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/movie.Movie'
+            type: array
+        "207":
+          description: Partial success
+          headers:
+            X-Failed-Ids:
+              description: Comma-separated ids that failed (up to 100)
+              type: string
+            X-Partial-Errors:
+              description: URL-encoded JSON array of {id, error} objects (up to 100)
+              type: string
+            X-Partial-Errors-Truncated:
+              description: true when headers contain only the first 100 failures
+              type: string
+          schema:
+            items:
+              $ref: '#/definitions/movie.Movie'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpapi.ErrorResponse'
+        "404":
+          description: No movies found in the range
+          schema:
+            $ref: '#/definitions/httpapi.ErrorResponse'
+        "408":
+          description: Request canceled
+          schema:
+            $ref: '#/definitions/httpapi.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/httpapi.ErrorResponse'
+        "502":
+          description: Movie stand error
+          schema:
+            $ref: '#/definitions/httpapi.ErrorResponse'
+        "504":
+          description: Movie stand timeout
+          schema:
+            $ref: '#/definitions/httpapi.ErrorResponse'
+      summary: Load movies by id range
+      tags:
+      - movies
+schemes:
+- http
+swagger: "2.0"
