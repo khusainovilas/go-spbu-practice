@@ -15,31 +15,9 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
-        "/healthz": {
-            "get": {
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "system"
-                ],
-                "summary": "Health check",
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    }
-                }
-            }
-        },
         "/last-movie": {
             "get": {
-                "description": "Finds the latest available movie on the stand. Movie ids are consecutive, so the service probes id 99999 and then uses binary search.",
+                "description": "Finds the latest available movie on the stand.",
                 "produces": [
                     "application/json"
                 ],
@@ -51,7 +29,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/movie.Movie"
+                            "$ref": "#/definitions/domain.Movie"
                         }
                     },
                     "404": {
@@ -62,12 +40,6 @@ const docTemplate = `{
                     },
                     "408": {
                         "description": "Request Timeout",
-                        "schema": {
-                            "$ref": "#/definitions/httpapi.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
                         "schema": {
                             "$ref": "#/definitions/httpapi.ErrorResponse"
                         }
@@ -89,7 +61,7 @@ const docTemplate = `{
         },
         "/load-movies": {
             "get": {
-                "description": "Loads movies from the external stand for ids in [from; to]. If some movies fail, the response is 207 with the successfully loaded movies and failure details in the X-Failed-Ids and X-Partial-Errors headers.",
+                "description": "Loads movies from the external stand. If some ids fail, the response is 207 with loaded movies and failed ids in the X-Failed-Ids header.",
                 "produces": [
                     "application/json"
                 ],
@@ -100,14 +72,14 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "integer",
-                        "description": "First movie id (must be \u003e 0)",
+                        "description": "First movie id (greater than zero)",
                         "name": "from",
                         "in": "query",
                         "required": true
                     },
                     {
                         "type": "integer",
-                        "description": "Last movie id (must be \u003e= from)",
+                        "description": "Last movie id (not less than from)",
                         "name": "to",
                         "in": "query",
                         "required": true
@@ -119,7 +91,7 @@ const docTemplate = `{
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/movie.Movie"
+                                "$ref": "#/definitions/domain.Movie"
                             }
                         }
                     },
@@ -128,21 +100,13 @@ const docTemplate = `{
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/movie.Movie"
+                                "$ref": "#/definitions/domain.Movie"
                             }
                         },
                         "headers": {
                             "X-Failed-Ids": {
                                 "type": "string",
-                                "description": "Comma-separated ids that failed (up to 100)"
-                            },
-                            "X-Partial-Errors": {
-                                "type": "string",
-                                "description": "URL-encoded JSON array of {id, error} objects (up to 100)"
-                            },
-                            "X-Partial-Errors-Truncated": {
-                                "type": "string",
-                                "description": "true when headers contain only the first 100 failures"
+                                "description": "Comma-separated movie ids that failed"
                             }
                         }
                     },
@@ -153,31 +117,25 @@ const docTemplate = `{
                         }
                     },
                     "404": {
-                        "description": "No movies found in the range",
+                        "description": "Not Found",
                         "schema": {
                             "$ref": "#/definitions/httpapi.ErrorResponse"
                         }
                     },
                     "408": {
-                        "description": "Request canceled",
-                        "schema": {
-                            "$ref": "#/definitions/httpapi.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
+                        "description": "Request Timeout",
                         "schema": {
                             "$ref": "#/definitions/httpapi.ErrorResponse"
                         }
                     },
                     "502": {
-                        "description": "Movie stand error",
+                        "description": "Bad Gateway",
                         "schema": {
                             "$ref": "#/definitions/httpapi.ErrorResponse"
                         }
                     },
                     "504": {
-                        "description": "Movie stand timeout",
+                        "description": "Gateway Timeout",
                         "schema": {
                             "$ref": "#/definitions/httpapi.ErrorResponse"
                         }
@@ -187,44 +145,28 @@ const docTemplate = `{
         }
     },
     "definitions": {
-        "httpapi.ErrorResponse": {
+        "domain.Movie": {
             "type": "object",
             "properties": {
-                "code": {
-                    "type": "string",
-                    "example": "invalid_argument"
-                },
-                "details": {
+                "actors": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/httpapi.Failure"
+                        "type": "string"
                     }
                 },
-                "error": {
+                "description": {
                     "type": "string",
-                    "example": "invalid from parameter"
-                }
-            }
-        },
-        "httpapi.Failure": {
-            "type": "object",
-            "properties": {
-                "error": {
-                    "type": "string",
-                    "example": "movie stand returned 500 Internal Server Error for movie 3"
+                    "example": "A psychologist visits a space station"
                 },
-                "id": {
-                    "type": "integer",
-                    "example": 3
-                }
-            }
-        },
-        "movie.Movie": {
-            "type": "object",
-            "properties": {
                 "director": {
                     "type": "string",
-                    "example": "John Lasseter"
+                    "example": "Andrei Tarkovsky"
+                },
+                "genres": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
                 },
                 "id": {
                     "type": "integer",
@@ -232,11 +174,20 @@ const docTemplate = `{
                 },
                 "title": {
                     "type": "string",
-                    "example": "Toy Story"
+                    "example": "Solaris"
                 },
                 "year": {
+                    "type": "integer",
+                    "example": 1972
+                }
+            }
+        },
+        "httpapi.ErrorResponse": {
+            "type": "object",
+            "properties": {
+                "error": {
                     "type": "string",
-                    "example": "1995"
+                    "example": "invalid movie range: from must not be greater than to"
                 }
             }
         }
@@ -250,7 +201,7 @@ var SwaggerInfo = &swag.Spec{
 	BasePath:         "/",
 	Schemes:          []string{"http"},
 	Title:            "Movie Service API",
-	Description:      "HTTP and gRPC API over the external movie stand.\nHTTP: GET /load-movies, GET /last-movie. gRPC: MovieService/LoadMovies, MovieService/GetLastMovie.",
+	Description:      "HTTP and gRPC API over an external movie stand.",
 	InfoInstanceName: "swagger",
 	SwaggerTemplate:  docTemplate,
 	LeftDelim:        "{{",

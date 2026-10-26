@@ -8,8 +8,11 @@ option go_package = "github.com/khusainovilas/go-spbu-practice/api/movie/v1;movi
 message Movie {
   int32 id = 1;
   string title = 2;
-  string year = 3;
+  int32 year = 3;
   string director = 4;
+  string description = 5;
+  repeated string actors = 6;
+  repeated string genres = 7;
 }
 
 // LoadMoviesRequest defines an inclusive range of movie ids.
@@ -28,7 +31,6 @@ message MovieError {
 message LoadMoviesResponse {
   repeated Movie movies = 1;
   repeated MovieError errors = 2;
-  bool partial = 3;
 }
 
 // GetLastMovieRequest is empty: the last movie is discovered automatically.

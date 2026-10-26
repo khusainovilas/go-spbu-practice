@@ -26,8 +26,11 @@ type Movie struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            int32                  `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
 	Title         string                 `protobuf:"bytes,2,opt,name=title,proto3" json:"title,omitempty"`
-	Year          string                 `protobuf:"bytes,3,opt,name=year,proto3" json:"year,omitempty"`
+	Year          int32                  `protobuf:"varint,3,opt,name=year,proto3" json:"year,omitempty"`
 	Director      string                 `protobuf:"bytes,4,opt,name=director,proto3" json:"director,omitempty"`
+	Description   string                 `protobuf:"bytes,5,opt,name=description,proto3" json:"description,omitempty"`
+	Actors        []string               `protobuf:"bytes,6,rep,name=actors,proto3" json:"actors,omitempty"`
+	Genres        []string               `protobuf:"bytes,7,rep,name=genres,proto3" json:"genres,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -76,11 +79,11 @@ func (x *Movie) GetTitle() string {
 	return ""
 }
 
-func (x *Movie) GetYear() string {
+func (x *Movie) GetYear() int32 {
 	if x != nil {
 		return x.Year
 	}
-	return ""
+	return 0
 }
 
 func (x *Movie) GetDirector() string {
@@ -88,6 +91,27 @@ func (x *Movie) GetDirector() string {
 		return x.Director
 	}
 	return ""
+}
+
+func (x *Movie) GetDescription() string {
+	if x != nil {
+		return x.Description
+	}
+	return ""
+}
+
+func (x *Movie) GetActors() []string {
+	if x != nil {
+		return x.Actors
+	}
+	return nil
+}
+
+func (x *Movie) GetGenres() []string {
+	if x != nil {
+		return x.Genres
+	}
+	return nil
 }
 
 // LoadMoviesRequest defines an inclusive range of movie ids.
@@ -201,7 +225,6 @@ type LoadMoviesResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Movies        []*Movie               `protobuf:"bytes,1,rep,name=movies,proto3" json:"movies,omitempty"`
 	Errors        []*MovieError          `protobuf:"bytes,2,rep,name=errors,proto3" json:"errors,omitempty"`
-	Partial       bool                   `protobuf:"varint,3,opt,name=partial,proto3" json:"partial,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -250,13 +273,6 @@ func (x *LoadMoviesResponse) GetErrors() []*MovieError {
 	return nil
 }
 
-func (x *LoadMoviesResponse) GetPartial() bool {
-	if x != nil {
-		return x.Partial
-	}
-	return false
-}
-
 // GetLastMovieRequest is empty: the last movie is discovered automatically.
 type GetLastMovieRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -298,23 +314,25 @@ var File_api_movie_v1_movie_proto protoreflect.FileDescriptor
 
 const file_api_movie_v1_movie_proto_rawDesc = "" +
 	"\n" +
-	"\x18api/movie/v1/movie.proto\x12\bmovie.v1\"]\n" +
+	"\x18api/movie/v1/movie.proto\x12\bmovie.v1\"\xaf\x01\n" +
 	"\x05Movie\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\x05R\x02id\x12\x14\n" +
 	"\x05title\x18\x02 \x01(\tR\x05title\x12\x12\n" +
-	"\x04year\x18\x03 \x01(\tR\x04year\x12\x1a\n" +
-	"\bdirector\x18\x04 \x01(\tR\bdirector\"7\n" +
+	"\x04year\x18\x03 \x01(\x05R\x04year\x12\x1a\n" +
+	"\bdirector\x18\x04 \x01(\tR\bdirector\x12 \n" +
+	"\vdescription\x18\x05 \x01(\tR\vdescription\x12\x16\n" +
+	"\x06actors\x18\x06 \x03(\tR\x06actors\x12\x16\n" +
+	"\x06genres\x18\a \x03(\tR\x06genres\"7\n" +
 	"\x11LoadMoviesRequest\x12\x12\n" +
 	"\x04from\x18\x01 \x01(\x05R\x04from\x12\x0e\n" +
 	"\x02to\x18\x02 \x01(\x05R\x02to\"6\n" +
 	"\n" +
 	"MovieError\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\x05R\x02id\x12\x18\n" +
-	"\amessage\x18\x02 \x01(\tR\amessage\"\x85\x01\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage\"k\n" +
 	"\x12LoadMoviesResponse\x12'\n" +
 	"\x06movies\x18\x01 \x03(\v2\x0f.movie.v1.MovieR\x06movies\x12,\n" +
-	"\x06errors\x18\x02 \x03(\v2\x14.movie.v1.MovieErrorR\x06errors\x12\x18\n" +
-	"\apartial\x18\x03 \x01(\bR\apartial\"\x15\n" +
+	"\x06errors\x18\x02 \x03(\v2\x14.movie.v1.MovieErrorR\x06errors\"\x15\n" +
 	"\x13GetLastMovieRequest2\x97\x01\n" +
 	"\fMovieService\x12G\n" +
 	"\n" +

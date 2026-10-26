@@ -1,113 +1,111 @@
-# Movie Service — HTTP + gRPC API
+# Movie Service — HTTP + gRPC API (ДЗ 3)
 
 Go-сервис, который предоставляет HTTP и gRPC API над внешним фильм-стендом.
-Это базовая ветка `movie-service` для третьего и последующих домашних заданий:
-сервис развивается в одном Go-модуле в корне репозитория.
+Ветка `movie-service` — база для следующих домашних заданий.
 
-## Возможности
+## Что умеет
 
-- `GET /load-movies?from=N&to=M` — загрузка фильмов в диапазоне `[from; to]`.
-- `GET /last-movie` — поиск последнего доступного фильма на стенде.
-- `MovieService.LoadMovies` и `MovieService.GetLastMovie` по gRPC.
+- `GET /load-movies?from=N&to=M` — загружает фильмы в диапазоне `[from; to]`.
+- `GET /last-movie` — находит последний доступный фильм на стенде.
+- gRPC `MovieService/LoadMovies` и `MovieService/GetLastMovie`.
 - Swagger UI: `http://localhost:8080/swagger/index.html`.
-- Контекст и таймаут на каждый запрос к стенду.
-- Частичные ошибки диапазона не теряются: HTTP возвращает `207 Multi-Status`
-  с успешными фильмами и заголовками `X-Failed-Ids` / `X-Partial-Errors`,
-  gRPC возвращает `errors` в `LoadMoviesResponse` и `partial = true`.
+- Каждый запрос к стенду идёт через `context` с таймаутом 5 секунд.
+- Ошибки стенда превращаются в понятные HTTP-статусы и gRPC-коды.
+- Частичные ошибки диапазона видны в ответе.
 
-## Быстрый старт
+## Запуск
 
-Нужен Go 1.25+. Сервис запускается без обязательных CLI-аргументов.
+Нужен Go 1.25+. Обязательных CLI-аргументов нет.
 
 ```powershell
-go run .
+go run ./cmd/server
 ```
 
-По умолчанию сервис ходит на `https://homeworksite.site`, HTTP слушает `:8080`,
-gRPC — `:9090`. Swagger открывается по адресу
-`http://localhost:8080/swagger/index.html`.
+По умолчанию:
 
-### Локальный mock-стенд
+- стенд: `https://homeworksite.site`;
+- HTTP: `:8080`;
+- gRPC: `:9090`.
 
-Если внешний стенд недоступен, для проверки можно поднять локальную заглушку.
-В ней фильмы имеют id от `1` до `MOCK_STAND_LAST_ID`:
+Проверка:
+
+```powershell
+curl.exe "http://localhost:8080/load-movies?from=1&to=3"
+curl.exe "http://localhost:8080/last-movie"
+```
+
+Swagger открывается в браузере: <http://localhost:8080/swagger/index.html>.
+
+### Локальный стенд
+
+Если внешний стенд недоступен, можно поднять маленькую заглушку. Она лежит в
+`testdata`, поэтому Go-тесты и автотесты её не видят (в `testdata` Go не ищет
+пакеты при `go build ./...` и `go test ./...`).
 
 ```powershell
 # терминал 1
 $env:MOCK_STAND_LAST_ID = "10"
-go run ./cmd/mock-stand
+go run ./testdata/mockstand
 
 # терминал 2
 $env:MOVIE_BASE_URL = "http://localhost:18080"
-go run .
+go run ./cmd/server
 ```
 
 Bash:
 
 ```bash
-MOCK_STAND_LAST_ID=10 go run ./cmd/mock-stand
-MOVIE_BASE_URL=http://localhost:18080 go run .
-```
-
-Примеры:
-
-```bash
-curl "http://localhost:8080/load-movies?from=1&to=3"
-curl "http://localhost:8080/last-movie"
+MOCK_STAND_LAST_ID=10 go run ./testdata/mockstand
+MOVIE_BASE_URL=http://localhost:18080 go run ./cmd/server
 ```
 
 ## Конфигурация
-
-Конфигурация читается только из переменных окружения. Пустое значение означает
-«использовать значение по умолчанию».
 
 | Переменная | По умолчанию | Назначение |
 |---|---|---|
 | `MOVIE_BASE_URL` | `https://homeworksite.site` | Базовый URL стенда. Фильм запрашивается по `{MOVIE_BASE_URL}/{id}/info.0.json`. |
 | `HTTP_ADDR` | `:8080` | Адрес HTTP-сервера. |
 | `GRPC_ADDR` | `:9090` | Адрес gRPC-сервера. |
-| `MOVIE_REQUEST_TIMEOUT` | `5s` | Таймаут одного запроса к стенду. |
-| `MOVIE_WORKERS` | `8` | Количество параллельных запросов при загрузке диапазона. |
-| `SHUTDOWN_TIMEOUT` | `10s` | Таймаут graceful shutdown. |
 
-`MOVIE_BASE_URL` и `HTTP_ADDR` — обязательные по заданию переменные; остальные
-добавлены для удобства эксплуатации и тоже имеют значения по умолчанию.
+Пустая переменная означает «взять значение по умолчанию».
 
 ## HTTP API
 
 ### `GET /load-movies?from=N&to=M`
 
-Успешный ответ `200` — JSON-массив фильмов:
+Успех — `200` и JSON-массив:
 
 ```json
 [
-  {"id": 1, "title": "Toy Story", "year": "1995", "director": "John Lasseter"}
+  {
+    "id": 1,
+    "title": "Solaris",
+    "year": 1972,
+    "director": "Andrei Tarkovsky",
+    "description": "A psychologist visits a space station",
+    "actors": ["Donatas Banionis"],
+    "genres": ["science fiction"]
+  }
 ]
 ```
 
 Если часть фильмов не загрузилась, возвращается `207 Multi-Status`: в теле —
-массив успешно загруженных фильмов, а ошибки — в заголовках:
-
-- `X-Failed-Count` — количество ошибок;
-- `X-Failed-Ids` — id через запятую (до 100 штук);
-- `X-Partial-Errors` — URL-encoded JSON `[{"id": 3, "error": "..."}]` (до 100 штук);
-- `X-Partial-Errors-Truncated` — `true`, если в заголовки попали только первые 100 ошибок.
+успешно загруженные фильмы, в заголовке `X-Failed-Ids` — id через запятую.
 
 Ошибки:
 
-- `400` — отсутствующий/нечисловой/неположительный `from` или `to`, либо `from > to`
-  (а также диапазон длиннее 100 000 id);
-- `404` — в диапазоне не найдено ни одного фильма;
+- `400` — `from`/`to` отсутствуют, не числа, меньше или равны нулю, либо `from > to`;
+- `404` — в диапазоне нет ни одного фильма;
 - `502` — стенд вернул ошибку или недоступен;
-- `504` — таймаут стенда.
+- `504` — стенд не ответил за таймаут.
 
 ### `GET /last-movie`
 
-Успешный ответ `200` — JSON одного фильма. Если стенд пуст — `404`.
+Успех — `200` и JSON одного фильма. Если стенд пуст — `404`.
 
-Поиск последнего фильма использует условие «id идут подряд от 1 до `last_id`»:
-сначала проверяется id `99999`; если он не найден, бинарным поиском ищется
-последний существующий id в `[1; 99998]`.
+По условию задачи id на стенде идут подряд от `1` до `last_id`, а `99999` —
+верхняя граница. Сначала проверяется id `99999`. Если его нет, бинарным поиском
+находится последний существующий id.
 
 ## gRPC API
 
@@ -120,37 +118,38 @@ service MovieService {
 }
 ```
 
-`LoadMoviesResponse` содержит `movies`, `errors` и `partial`. Некорректные
-`from`/`to` возвращают `InvalidArgument`, пустой стенд — `NotFound`, ошибки
-стенда — `Unavailable` / `DeadlineExceeded` / `Internal`.
+`LoadMoviesResponse` содержит `movies` и `errors` — ошибки по отдельным фильмам.
+Некорректные `from`/`to` дают `InvalidArgument`, пустой стенд — `NotFound`,
+ошибки стенда — `Unavailable` или `DeadlineExceeded`.
 
-Пример через `grpcurl` (gRPC reflection включён):
+Пример через `grpcurl` (включён gRPC reflection):
 
 ```bash
 grpcurl -plaintext localhost:9090 list
-grpcurl -plaintext -import-path . -proto api/movie/v1/movie.proto \
-  localhost:9090 movie.v1.MovieService/LoadMovies -d '{"from":1,"to":3}'
-grpcurl -plaintext -import-path . -proto api/movie/v1/movie.proto \
-  localhost:9090 movie.v1.MovieService/GetLastMovie -d '{}'
+grpcurl -plaintext -d '{"from":1,"to":3}' \
+  localhost:9090 movie.v1.MovieService/LoadMovies
+grpcurl -plaintext -d '{}' \
+  localhost:9090 movie.v1.MovieService/GetLastMovie
 ```
 
 ## Структура
 
 ```text
-main.go                      — запуск HTTP и gRPC серверов, graceful shutdown
-cmd/mock-stand/              — локальная заглушка стенда для разработки
-internal/config/             — конфигурация из env
-internal/movie/              — доменная модель и ошибки
-internal/stand/              — HTTP-клиент внешнего стенда
-internal/service/            — бизнес-логика: диапазон, частичные ошибки, поиск последнего
-internal/transport/httpapi/  — HTTP-хендлеры, JSON-ошибки, middleware
-internal/transport/grpcapi/  — gRPC-сервер, маппинг ошибок, интерсепторы
-api/movie/v1/                — protobuf-контракт и сгенерированный код
-docs/                        — сгенерированный Swagger (Swagger 2.0)
+cmd/server/              — точка входа: конфиг, сборка зависимостей, запуск серверов
+internal/domain/         — модель Movie и доменные ошибки
+internal/usecase/        — бизнес-логика: диапазон, частичные ошибки, поиск последнего
+internal/adapter/stand/  — HTTP-клиент внешнего стенда
+internal/handler/httpapi/— HTTP-хендлеры и Swagger
+internal/handler/grpcapi/— gRPC-сервер и маппинг ошибок
+api/movie/v1/            — protobuf-контракт и сгенерированный код
+docs/                    — сгенерированный Swagger
+testdata/mockstand/      — локальная заглушка стенда (не входит в сборку ./...)
 ```
 
-Зависимости слоёв: transport → service → stand → внешний стенд. Транспорты не
-ходят в стенд напрямую и не дублируют бизнес-логику.
+Направление зависимостей: `handler → usecase → domain`, `adapter → domain`.
+`usecase` работает с интерфейсом `MovieProvider`, а конкретный клиент стенда
+подключается в `cmd/server`. Поэтому бизнес-логика не зависит от HTTP, gRPC и
+внешнего сайта. Такая структура сразу подходит и для ДЗ 4.
 
 ## Разработка
 
@@ -171,14 +170,66 @@ protoc \
 Перегенерация Swagger (нужен `swag`):
 
 ```bash
-swag init -g main.go -o docs --parseInternal
+swag init -g cmd/server/main.go -o docs --parseInternal
 ```
 
-Сгенерированные файлы лежат в репозитории, поэтому для сборки и запуска
-`protoc` и `swag` не обязательны.
+Сгенерированные файлы лежат в репозитории, поэтому для обычной сборки `protoc`
+и `swag` не нужны.
+
+## Автотесты курса
+
+`grade.yml` — это переиспользуемый workflow курса. Он не запускается сам по себе
+из корня репозитория. В свой репозиторий нужно один раз положить
+`ci-example.yml` из репозитория курса как `.github/workflows/course.yml`.
+Этот файл вызывает `vacmannnn/go-courses/.github/workflows/grade.yml@main`.
+
+Дальше достаточно открыть PR в `main` с номером задания в заголовке:
+
+```text
+ДЗ 3 — HTTP/gRPC API
+```
+
+или `task3`. Результат появится во вкладке **Checks** PR. Если изменить заголовок
+PR, проверка запустится заново. Параметры workflow менять не нужно.
+
+### Локальный запуск автотестов
+
+```powershell
+# 1. Клонировать тесты курса
+git clone --depth 1 https://github.com/vacmannnn/go-courses "$env:TEMP\go-courses-tests"
+
+# 2. Поставить зависимость тестов
+cd "$env:TEMP\go-courses-tests\autotests"
+python -m pip install -r requirements.txt
+
+# 3. Запустить проверку ДЗ 3 для этого репозитория
+python scripts/ci.py `
+  --repo C:\university\golang\go-spbu-practice `
+  --pr-title "ДЗ 3" `
+  --report "$env:TEMP\task3-report.json"
+```
+
+`ci.py` сам найдёт `go.mod` в корне и единственный `main`-пакет (`cmd/server`),
+соберёт его и запустит 5 HTTP-тестов из `task3/http_test.go`.
+
+На Linux и в GitHub Actions этого достаточно. На Windows есть особенность
+самого тестового скрипта: `check.py` собирает бинарник с именем `student-app`
+без `.exe`, а `exec` на Windows не находит такой файл. Поэтому локально на
+Windows тесты удобнее запустить вручную с готовым `.exe`:
+
+```powershell
+cd C:\university\golang\go-spbu-practice
+go build -o "$env:TEMP\movie-service.exe" ./cmd/server
+
+cd "$env:TEMP\go-courses-tests\autotests"
+$env:COURSE_SOLUTION_BIN = "$env:TEMP\movie-service.exe"
+go test -race -count=1 -timeout=120s -run '^TestCourse' ./task3
+```
+
+Ожидаемый результат: `ok go-course-tests/task3`.
 
 ## Ветки
 
-- `movie-service` — базовая ветка этого сервиса.
+- `movie-service` — базовая ветка сервиса (ДЗ 3).
 - Следующее ДЗ: `git checkout -b hw4-... movie-service`.
-- Предыдущие ДЗ (`HW1`, `HW2`) остаются в своих ветках и не смешиваются с сервисом.
+- Предыдущие ДЗ остаются в своих ветках.
