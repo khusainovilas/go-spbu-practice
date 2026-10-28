@@ -40,6 +40,11 @@ func TestLoadMovies(t *testing.T) {
 	if len(result.Failed) != 0 {
 		t.Fatalf("got %d failures, want 0", len(result.Failed))
 	}
+	for i, item := range result.Movies {
+		if item.ID != i+1 {
+			t.Fatalf("movies are not sorted by id: got %+v", result.Movies)
+		}
+	}
 }
 
 func TestLoadMoviesPartialFailure(t *testing.T) {

@@ -5,7 +5,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sort"
+	"sync"
 )
+
+// defaultWorkers is the number of concurrent requests to the movie stand.
+const defaultWorkers = 8
 
 // Movie is a movie returned by the external stand.
 type Movie struct {
@@ -50,38 +55,91 @@ type LoadResult struct {
 // Service implements the movie business logic.
 type Service struct {
 	provider MovieProvider
+	workers  int
 }
 
 // NewService creates a movie service.
 func NewService(provider MovieProvider) *Service {
-	return &Service{provider: provider}
+	return &Service{
+		provider: provider,
+		workers:  defaultWorkers,
+	}
 }
 
 // LoadMovies loads every movie id in [from; to]. If one movie fails, the rest
 // are still loaded and the failure is returned in LoadResult.Failed.
+//
+// A fixed number of workers load the range concurrently. The context cancels
+// all remaining work, and the final slices are sorted by id.
 func (s *Service) LoadMovies(ctx context.Context, from, to int) (LoadResult, error) {
 	if err := validateRange(from, to); err != nil {
 		return LoadResult{}, err
 	}
 
 	result := LoadResult{
-		Movies: make([]Movie, 0, to-from+1),
+		Movies: make([]Movie, 0),
 		Failed: make([]FailedMovie, 0),
 	}
 
-	for id := from; id <= to; id++ {
-		if err := ctx.Err(); err != nil {
-			return result, err
-		}
-
-		item, err := s.provider.GetMovie(ctx, id)
-		if err != nil {
-			result.Failed = append(result.Failed, FailedMovie{ID: id, Err: err})
-			continue
-		}
-		result.Movies = append(result.Movies, item)
+	type jobResult struct {
+		id    int
+		movie Movie
+		err   error
 	}
 
+	jobs := make(chan int)
+	results := make(chan jobResult)
+
+	var wg sync.WaitGroup
+	for i := 0; i < s.workers; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for id := range jobs {
+				item, err := s.provider.GetMovie(ctx, id)
+				select {
+				case results <- jobResult{id: id, movie: item, err: err}:
+				case <-ctx.Done():
+					return
+				}
+			}
+		}()
+	}
+
+	go func() {
+		defer close(jobs)
+		for id := from; id <= to; id++ {
+			select {
+			case jobs <- id:
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+
+	go func() {
+		wg.Wait()
+		close(results)
+	}()
+
+	for item := range results {
+		if item.err != nil {
+			result.Failed = append(result.Failed, FailedMovie{ID: item.id, Err: item.err})
+			continue
+		}
+		result.Movies = append(result.Movies, item.movie)
+	}
+
+	sort.Slice(result.Movies, func(i, j int) bool {
+		return result.Movies[i].ID < result.Movies[j].ID
+	})
+	sort.Slice(result.Failed, func(i, j int) bool {
+		return result.Failed[i].ID < result.Failed[j].ID
+	})
+
+	if err := ctx.Err(); err != nil {
+		return result, err
+	}
 	return result, nil
 }
 
