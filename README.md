@@ -1,7 +1,8 @@
 # Movie Service — HTTP + gRPC API (ДЗ 3)
 
 Go-сервис, который предоставляет HTTP и gRPC API над внешним фильм-стендом.
-Ветка `movie-service` — база для следующих домашних заданий.
+Это простая версия для ДЗ 3: код разделён на небольшие пакеты, но без лишних
+архитектурных слоёв.
 
 ## Что умеет
 
@@ -18,7 +19,7 @@ Go-сервис, который предоставляет HTTP и gRPC API на
 Нужен Go 1.25+. Обязательных CLI-аргументов нет.
 
 ```powershell
-go run ./cmd/server
+go run .
 ```
 
 По умолчанию:
@@ -39,8 +40,7 @@ Swagger открывается в браузере: <http://localhost:8080/swagg
 ### Локальный стенд
 
 Если внешний стенд недоступен, можно поднять маленькую заглушку. Она лежит в
-`testdata`, поэтому Go-тесты и автотесты её не видят (в `testdata` Go не ищет
-пакеты при `go build ./...` и `go test ./...`).
+`testdata`, поэтому не попадает в `go build ./...` и `go test ./...`.
 
 ```powershell
 # терминал 1
@@ -49,14 +49,14 @@ go run ./testdata/mockstand
 
 # терминал 2
 $env:MOVIE_BASE_URL = "http://localhost:18080"
-go run ./cmd/server
+go run .
 ```
 
 Bash:
 
 ```bash
 MOCK_STAND_LAST_ID=10 go run ./testdata/mockstand
-MOVIE_BASE_URL=http://localhost:18080 go run ./cmd/server
+MOVIE_BASE_URL=http://localhost:18080 go run .
 ```
 
 ## Конфигурация
@@ -135,21 +135,27 @@ grpcurl -plaintext -d '{}' \
 ## Структура
 
 ```text
-cmd/server/              — точка входа: конфиг, сборка зависимостей, запуск серверов
-internal/domain/         — модель Movie и доменные ошибки
-internal/usecase/        — бизнес-логика: диапазон, частичные ошибки, поиск последнего
-internal/adapter/stand/  — HTTP-клиент внешнего стенда
-internal/handler/httpapi/— HTTP-хендлеры и Swagger
-internal/handler/grpcapi/— gRPC-сервер и маппинг ошибок
+main.go                  — конфиг, сборка зависимостей, запуск HTTP и gRPC
+internal/movie/          — Movie, ошибки и бизнес-логика
+internal/stand/          — HTTP-клиент внешнего стенда
+internal/api/            — HTTP- и gRPC-хендлеры
 api/movie/v1/            — protobuf-контракт и сгенерированный код
 docs/                    — сгенерированный Swagger
-testdata/mockstand/      — локальная заглушка стенда (не входит в сборку ./...)
+testdata/mockstand/      — локальная заглушка стенда
 ```
 
-Направление зависимостей: `handler → usecase → domain`, `adapter → domain`.
-`usecase` работает с интерфейсом `MovieProvider`, а конкретный клиент стенда
-подключается в `cmd/server`. Поэтому бизнес-логика не зависит от HTTP, gRPC и
-внешнего сайта. Такая структура сразу подходит и для ДЗ 4.
+Зависимости простые:
+
+```text
+main -> api -> movie
+main -> stand -> movie
+```
+
+`movie` не знает ни про HTTP, ни про gRPC, ни про конкретный сайт: он работает
+с интерфейсом `MovieProvider`. Реальный клиент стенда подключается в `main`.
+
+Загрузка диапазона последовательная — для ДЗ 3 этого достаточно, а код с
+worker pool был бы длиннее.
 
 ## Разработка
 
@@ -170,7 +176,7 @@ protoc \
 Перегенерация Swagger (нужен `swag`):
 
 ```bash
-swag init -g cmd/server/main.go -o docs --parseInternal
+swag init -g main.go -o docs --parseInternal
 ```
 
 Сгенерированные файлы лежат в репозитории, поэтому для обычной сборки `protoc`
@@ -209,17 +215,18 @@ python scripts/ci.py `
   --report "$env:TEMP\task3-report.json"
 ```
 
-`ci.py` сам найдёт `go.mod` в корне и единственный `main`-пакет (`cmd/server`),
-соберёт его и запустит 5 HTTP-тестов из `task3/http_test.go`.
+`ci.py` сам найдёт `go.mod` в корне и единственный `main`-пакет — корень
+репозитория. После этого он соберёт сервис и запустит 5 HTTP-тестов из
+`task3/http_test.go`.
 
 На Linux и в GitHub Actions этого достаточно. На Windows есть особенность
 самого тестового скрипта: `check.py` собирает бинарник с именем `student-app`
-без `.exe`, а `exec` на Windows не находит такой файл. Поэтому локально на
+без `.exe`, а Windows не находит такой файл при запуске. Поэтому локально на
 Windows тесты удобнее запустить вручную с готовым `.exe`:
 
 ```powershell
 cd C:\university\golang\go-spbu-practice
-go build -o "$env:TEMP\movie-service.exe" ./cmd/server
+go build -o "$env:TEMP\movie-service.exe" .
 
 cd "$env:TEMP\go-courses-tests\autotests"
 $env:COURSE_SOLUTION_BIN = "$env:TEMP\movie-service.exe"
@@ -230,6 +237,7 @@ go test -race -count=1 -timeout=120s -run '^TestCourse' ./task3
 
 ## Ветки
 
-- `movie-service` — базовая ветка сервиса (ДЗ 3).
-- Следующее ДЗ: `git checkout -b hw4-... movie-service`.
+- `movie-service` — простая версия сервиса для ДЗ 3.
+- Для ДЗ 4 можно ответвить отдельную ветку и при необходимости разнести
+  `movie` на `domain` и `usecase`, а `api` — на `handler`.
 - Предыдущие ДЗ остаются в своих ветках.

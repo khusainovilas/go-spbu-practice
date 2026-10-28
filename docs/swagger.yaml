@@ -1,6 +1,12 @@
 basePath: /
 definitions:
-  domain.Movie:
+  api.ErrorResponse:
+    properties:
+      error:
+        example: 'invalid movie range: from must not be greater than to'
+        type: string
+    type: object
+  movie.Movie:
     properties:
       actors:
         items:
@@ -26,12 +32,6 @@ definitions:
         example: 1972
         type: integer
     type: object
-  httpapi.ErrorResponse:
-    properties:
-      error:
-        example: 'invalid movie range: from must not be greater than to'
-        type: string
-    type: object
 info:
   contact: {}
   description: HTTP and gRPC API over an external movie stand.
@@ -47,23 +47,23 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/domain.Movie'
+            $ref: '#/definitions/movie.Movie'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/httpapi.ErrorResponse'
+            $ref: '#/definitions/api.ErrorResponse'
         "408":
           description: Request Timeout
           schema:
-            $ref: '#/definitions/httpapi.ErrorResponse'
+            $ref: '#/definitions/api.ErrorResponse'
         "502":
           description: Bad Gateway
           schema:
-            $ref: '#/definitions/httpapi.ErrorResponse'
+            $ref: '#/definitions/api.ErrorResponse'
         "504":
           description: Gateway Timeout
           schema:
-            $ref: '#/definitions/httpapi.ErrorResponse'
+            $ref: '#/definitions/api.ErrorResponse'
       summary: Get the last movie
       tags:
       - movies
@@ -89,7 +89,7 @@ paths:
           description: OK
           schema:
             items:
-              $ref: '#/definitions/domain.Movie'
+              $ref: '#/definitions/movie.Movie'
             type: array
         "207":
           description: Partial success
@@ -99,28 +99,28 @@ paths:
               type: string
           schema:
             items:
-              $ref: '#/definitions/domain.Movie'
+              $ref: '#/definitions/movie.Movie'
             type: array
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/httpapi.ErrorResponse'
+            $ref: '#/definitions/api.ErrorResponse'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/httpapi.ErrorResponse'
+            $ref: '#/definitions/api.ErrorResponse'
         "408":
           description: Request Timeout
           schema:
-            $ref: '#/definitions/httpapi.ErrorResponse'
+            $ref: '#/definitions/api.ErrorResponse'
         "502":
           description: Bad Gateway
           schema:
-            $ref: '#/definitions/httpapi.ErrorResponse'
+            $ref: '#/definitions/api.ErrorResponse'
         "504":
           description: Gateway Timeout
           schema:
-            $ref: '#/definitions/httpapi.ErrorResponse'
+            $ref: '#/definitions/api.ErrorResponse'
       summary: Load movies by id range
       tags:
       - movies

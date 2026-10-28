@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/khusainovilas/go-spbu-practice/internal/domain"
+	"github.com/khusainovilas/go-spbu-practice/internal/movie"
 )
 
 func TestGetMovie(t *testing.T) {
@@ -22,12 +22,12 @@ func TestGetMovie(t *testing.T) {
 	defer server.Close()
 
 	client := NewClient(server.URL, time.Second)
-	movie, err := client.GetMovie(context.Background(), 1)
+	item, err := client.GetMovie(context.Background(), 1)
 	if err != nil {
 		t.Fatalf("GetMovie: %v", err)
 	}
-	if movie.ID != 1 || movie.Title != "Solaris" || movie.Year != 1972 {
-		t.Fatalf("unexpected movie: %+v", movie)
+	if item.ID != 1 || item.Title != "Solaris" || item.Year != 1972 {
+		t.Fatalf("unexpected movie: %+v", item)
 	}
 }
 
@@ -37,7 +37,7 @@ func TestGetMovieNotFound(t *testing.T) {
 
 	client := NewClient(server.URL, time.Second)
 	_, err := client.GetMovie(context.Background(), 2)
-	if !errors.Is(err, domain.ErrNotFound) {
+	if !errors.Is(err, movie.ErrNotFound) {
 		t.Fatalf("got %v, want ErrNotFound", err)
 	}
 }
@@ -50,7 +50,7 @@ func TestGetMovieUpstreamError(t *testing.T) {
 
 	client := NewClient(server.URL, time.Second)
 	_, err := client.GetMovie(context.Background(), 1)
-	if !errors.Is(err, domain.ErrUpstream) {
+	if !errors.Is(err, movie.ErrUpstream) {
 		t.Fatalf("got %v, want ErrUpstream", err)
 	}
 }

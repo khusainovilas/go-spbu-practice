@@ -1,5 +1,5 @@
-// Package httpapi serves the movie API over HTTP.
-package httpapi
+// Package api contains the HTTP and gRPC transport layer.
+package api
 
 import (
 	"context"
@@ -10,23 +10,22 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/khusainovilas/go-spbu-practice/internal/domain"
-	"github.com/khusainovilas/go-spbu-practice/internal/usecase"
+	"github.com/khusainovilas/go-spbu-practice/internal/movie"
 	httpSwagger "github.com/swaggo/http-swagger/v2"
 )
 
-// Handler serves HTTP requests.
-type Handler struct {
-	service usecase.MovieUseCase
+// HTTPHandler serves the movie API over HTTP.
+type HTTPHandler struct {
+	service *movie.Service
 }
 
-// New creates an HTTP handler.
-func New(service usecase.MovieUseCase) *Handler {
-	return &Handler{service: service}
+// NewHTTP creates an HTTP handler.
+func NewHTTP(service *movie.Service) *HTTPHandler {
+	return &HTTPHandler{service: service}
 }
 
 // Routes registers HTTP routes and Swagger UI.
-func (h *Handler) Routes() http.Handler {
+func (h *HTTPHandler) Routes() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /load-movies", h.loadMovies)
 	mux.HandleFunc("GET /last-movie", h.lastMovie)
@@ -47,8 +46,8 @@ type ErrorResponse struct {
 // @Produce      json
 // @Param        from  query     int  true  "First movie id (greater than zero)"
 // @Param        to    query     int  true  "Last movie id (not less than from)"
-// @Success      200   {array}   domain.Movie
-// @Success      207   {array}   domain.Movie  "Partial success"
+// @Success      200   {array}   movie.Movie
+// @Success      207   {array}   movie.Movie  "Partial success"
 // @Header       207   {string}  X-Failed-Ids  "Comma-separated movie ids that failed"
 // @Failure      400   {object}  ErrorResponse
 // @Failure      404   {object}  ErrorResponse
@@ -56,7 +55,7 @@ type ErrorResponse struct {
 // @Failure      502   {object}  ErrorResponse
 // @Failure      504   {object}  ErrorResponse
 // @Router       /load-movies [get]
-func (h *Handler) loadMovies(w http.ResponseWriter, r *http.Request) {
+func (h *HTTPHandler) loadMovies(w http.ResponseWriter, r *http.Request) {
 	from, err := queryInt(r, "from")
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err)
@@ -94,19 +93,19 @@ func (h *Handler) loadMovies(w http.ResponseWriter, r *http.Request) {
 // @Description  Finds the latest available movie on the stand.
 // @Tags         movies
 // @Produce      json
-// @Success      200  {object}  domain.Movie
+// @Success      200  {object}  movie.Movie
 // @Failure      404  {object}  ErrorResponse
 // @Failure      408  {object}  ErrorResponse
 // @Failure      502  {object}  ErrorResponse
 // @Failure      504  {object}  ErrorResponse
 // @Router       /last-movie [get]
-func (h *Handler) lastMovie(w http.ResponseWriter, r *http.Request) {
-	movie, err := h.service.GetLastMovie(r.Context())
+func (h *HTTPHandler) lastMovie(w http.ResponseWriter, r *http.Request) {
+	item, err := h.service.GetLastMovie(r.Context())
 	if err != nil {
 		writeError(w, statusForError(err), err)
 		return
 	}
-	writeJSON(w, http.StatusOK, movie)
+	writeJSON(w, http.StatusOK, item)
 }
 
 func queryInt(r *http.Request, name string) (int, error) {
@@ -131,18 +130,18 @@ func writeError(w http.ResponseWriter, status int, err error) {
 	writeJSON(w, status, ErrorResponse{Error: err.Error()})
 }
 
-// statusForError converts a domain error into an HTTP status code.
+// statusForError converts a service error into an HTTP status code.
 func statusForError(err error) int {
 	switch {
-	case errors.Is(err, domain.ErrInvalidRange):
+	case errors.Is(err, movie.ErrInvalidRange):
 		return http.StatusBadRequest
 	case errors.Is(err, context.Canceled):
 		return http.StatusRequestTimeout
 	case errors.Is(err, context.DeadlineExceeded):
 		return http.StatusGatewayTimeout
-	case errors.Is(err, domain.ErrNotFound):
+	case errors.Is(err, movie.ErrNotFound):
 		return http.StatusNotFound
-	case errors.Is(err, domain.ErrUpstream):
+	case errors.Is(err, movie.ErrUpstream):
 		return http.StatusBadGateway
 	default:
 		return http.StatusInternalServerError
@@ -150,25 +149,25 @@ func statusForError(err error) int {
 }
 
 // statusForFailed returns the status for a range where every movie failed.
-func statusForFailed(failed []usecase.FailedMovie) int {
+func statusForFailed(failed []movie.FailedMovie) int {
 	for _, item := range failed {
-		if !errors.Is(item.Err, domain.ErrNotFound) {
+		if !errors.Is(item.Err, movie.ErrNotFound) {
 			return statusForError(item.Err)
 		}
 	}
 	return http.StatusNotFound
 }
 
-func firstFailure(failed []usecase.FailedMovie) error {
+func firstFailure(failed []movie.FailedMovie) error {
 	for _, item := range failed {
-		if !errors.Is(item.Err, domain.ErrNotFound) {
+		if !errors.Is(item.Err, movie.ErrNotFound) {
 			return item.Err
 		}
 	}
-	return fmt.Errorf("%w: no movies found in the requested range", domain.ErrNotFound)
+	return fmt.Errorf("%w: no movies found in the requested range", movie.ErrNotFound)
 }
 
-func failedIDs(failed []usecase.FailedMovie) string {
+func failedIDs(failed []movie.FailedMovie) string {
 	ids := make([]string, 0, len(failed))
 	for _, item := range failed {
 		ids = append(ids, strconv.Itoa(item.ID))

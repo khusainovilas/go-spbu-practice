@@ -1,38 +1,36 @@
-// Package grpcapi serves the movie API over gRPC.
-package grpcapi
+package api
 
 import (
 	"context"
 	"errors"
 
 	moviev1 "github.com/khusainovilas/go-spbu-practice/api/movie/v1"
-	"github.com/khusainovilas/go-spbu-practice/internal/domain"
-	"github.com/khusainovilas/go-spbu-practice/internal/usecase"
+	"github.com/khusainovilas/go-spbu-practice/internal/movie"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
 
-// Server implements moviev1.MovieServiceServer.
-type Server struct {
+// GRPCServer implements moviev1.MovieServiceServer.
+type GRPCServer struct {
 	moviev1.UnimplementedMovieServiceServer
 
-	service usecase.MovieUseCase
+	service *movie.Service
 }
 
-// New creates a gRPC server.
-func New(service usecase.MovieUseCase) *Server {
-	return &Server{service: service}
+// NewGRPC creates a gRPC server.
+func NewGRPC(service *movie.Service) *GRPCServer {
+	return &GRPCServer{service: service}
 }
 
 // LoadMovies loads movies with ids in [from; to].
-func (s *Server) LoadMovies(ctx context.Context, req *moviev1.LoadMoviesRequest) (*moviev1.LoadMoviesResponse, error) {
+func (s *GRPCServer) LoadMovies(ctx context.Context, req *moviev1.LoadMoviesRequest) (*moviev1.LoadMoviesResponse, error) {
 	result, err := s.service.LoadMovies(ctx, int(req.GetFrom()), int(req.GetTo()))
 	if err != nil {
-		return nil, statusForError(err)
+		return nil, grpcStatusForError(err)
 	}
 
 	if len(result.Movies) == 0 && len(result.Failed) > 0 {
-		return nil, statusForFailed(result.Failed)
+		return nil, grpcStatusForFailed(result.Failed)
 	}
 
 	response := &moviev1.LoadMoviesResponse{
@@ -52,49 +50,49 @@ func (s *Server) LoadMovies(ctx context.Context, req *moviev1.LoadMoviesRequest)
 }
 
 // GetLastMovie returns the latest movie available on the stand.
-func (s *Server) GetLastMovie(ctx context.Context, _ *moviev1.GetLastMovieRequest) (*moviev1.Movie, error) {
-	movie, err := s.service.GetLastMovie(ctx)
+func (s *GRPCServer) GetLastMovie(ctx context.Context, _ *moviev1.GetLastMovieRequest) (*moviev1.Movie, error) {
+	item, err := s.service.GetLastMovie(ctx)
 	if err != nil {
-		return nil, statusForError(err)
+		return nil, grpcStatusForError(err)
 	}
-	return toProtoMovie(movie), nil
+	return toProtoMovie(item), nil
 }
 
-func toProtoMovie(movie domain.Movie) *moviev1.Movie {
+func toProtoMovie(item movie.Movie) *moviev1.Movie {
 	return &moviev1.Movie{
-		Id:          int32(movie.ID),
-		Title:       movie.Title,
-		Year:        int32(movie.Year),
-		Director:    movie.Director,
-		Description: movie.Description,
-		Actors:      movie.Actors,
-		Genres:      movie.Genres,
+		Id:          int32(item.ID),
+		Title:       item.Title,
+		Year:        int32(item.Year),
+		Director:    item.Director,
+		Description: item.Description,
+		Actors:      item.Actors,
+		Genres:      item.Genres,
 	}
 }
 
-// statusForError converts a domain error into a gRPC status.
-func statusForError(err error) error {
+// grpcStatusForError converts a service error into a gRPC status.
+func grpcStatusForError(err error) error {
 	switch {
-	case errors.Is(err, domain.ErrInvalidRange):
+	case errors.Is(err, movie.ErrInvalidRange):
 		return status.Error(codes.InvalidArgument, err.Error())
 	case errors.Is(err, context.Canceled):
 		return status.Error(codes.Canceled, err.Error())
 	case errors.Is(err, context.DeadlineExceeded):
 		return status.Error(codes.DeadlineExceeded, err.Error())
-	case errors.Is(err, domain.ErrNotFound):
+	case errors.Is(err, movie.ErrNotFound):
 		return status.Error(codes.NotFound, err.Error())
-	case errors.Is(err, domain.ErrUpstream):
+	case errors.Is(err, movie.ErrUpstream):
 		return status.Error(codes.Unavailable, err.Error())
 	default:
 		return status.Error(codes.Internal, err.Error())
 	}
 }
 
-// statusForFailed returns the status for a range where every movie failed.
-func statusForFailed(failed []usecase.FailedMovie) error {
+// grpcStatusForFailed returns the status for a range where every movie failed.
+func grpcStatusForFailed(failed []movie.FailedMovie) error {
 	for _, item := range failed {
-		if !errors.Is(item.Err, domain.ErrNotFound) {
-			return statusForError(item.Err)
+		if !errors.Is(item.Err, movie.ErrNotFound) {
+			return grpcStatusForError(item.Err)
 		}
 	}
 	return status.Error(codes.NotFound, "no movies found in the requested range")
