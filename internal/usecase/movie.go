@@ -1,4 +1,4 @@
-package movie
+package usecase
 
 import (
 	"context"
@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"sort"
 	"sync"
+
+	"github.com/khusainovilas/go-spbu-practice/internal/domain"
 )
 
 const (
@@ -13,31 +15,13 @@ const (
 	LastMovieProbeID = 99999
 )
 
-type Movie struct {
-	ID       int    `json:"id"`
-	Title    string `json:"title"`
-	Year     int    `json:"year"`
-	Director string `json:"director"`
-}
-
-var (
-	ErrNotFound     = errors.New("movie not found")
-	ErrInvalidRange = errors.New("invalid movie range")
-	ErrUpstream     = errors.New("movie stand error")
-)
-
 type MovieProvider interface {
-	GetMovie(ctx context.Context, id int) (Movie, error)
+	GetMovie(ctx context.Context, id int) (domain.Movie, error)
 }
 
-type FailedMovie struct {
-	ID  int
-	Err error
-}
-
-type LoadResult struct {
-	Movies []Movie
-	Failed []FailedMovie
+type MovieUseCase interface {
+	LoadMovies(ctx context.Context, from, to int) (domain.LoadResult, error)
+	GetLastMovie(ctx context.Context) (domain.Movie, error)
 }
 
 type Service struct {
@@ -49,17 +33,19 @@ func NewService(provider MovieProvider) *Service {
 	return &Service{provider: provider, workers: defaultWorkers}
 }
 
+var _ MovieUseCase = (*Service)(nil)
+
 // LoadMovies loads movies in [from; to] using a small worker pool.
-func (s *Service) LoadMovies(ctx context.Context, from, to int) (LoadResult, error) {
+func (s *Service) LoadMovies(ctx context.Context, from, to int) (domain.LoadResult, error) {
 	if err := validateRange(from, to); err != nil {
-		return LoadResult{}, err
+		return domain.LoadResult{}, err
 	}
 
-	var result LoadResult
+	var result domain.LoadResult
 
 	type jobResult struct {
 		id    int
-		movie Movie
+		movie domain.Movie
 		err   error
 	}
 
@@ -100,7 +86,7 @@ func (s *Service) LoadMovies(ctx context.Context, from, to int) (LoadResult, err
 
 	for item := range results {
 		if item.err != nil {
-			result.Failed = append(result.Failed, FailedMovie{ID: item.id, Err: item.err})
+			result.Failed = append(result.Failed, domain.FailedMovie{ID: item.id, Err: item.err})
 			continue
 		}
 		result.Movies = append(result.Movies, item.movie)
@@ -121,34 +107,34 @@ func (s *Service) LoadMovies(ctx context.Context, from, to int) (LoadResult, err
 
 func validateRange(from, to int) error {
 	if from <= 0 {
-		return fmt.Errorf("%w: from must be greater than zero", ErrInvalidRange)
+		return fmt.Errorf("%w: from must be greater than zero", domain.ErrInvalidRange)
 	}
 	if to <= 0 {
-		return fmt.Errorf("%w: to must be greater than zero", ErrInvalidRange)
+		return fmt.Errorf("%w: to must be greater than zero", domain.ErrInvalidRange)
 	}
 	if from > to {
-		return fmt.Errorf("%w: from must not be greater than to", ErrInvalidRange)
+		return fmt.Errorf("%w: from must not be greater than to", domain.ErrInvalidRange)
 	}
 	return nil
 }
 
 // GetLastMovie finds the last movie using the consecutive ids rule.
-func (s *Service) GetLastMovie(ctx context.Context) (Movie, error) {
+func (s *Service) GetLastMovie(ctx context.Context) (domain.Movie, error) {
 	last, err := s.provider.GetMovie(ctx, LastMovieProbeID)
 	if err == nil {
 		return last, nil
 	}
-	if !errors.Is(err, ErrNotFound) {
-		return Movie{}, err
+	if !errors.Is(err, domain.ErrNotFound) {
+		return domain.Movie{}, err
 	}
 
 	lo, hi := 1, LastMovieProbeID-1
-	var found Movie
+	var found domain.Movie
 	foundAny := false
 
 	for lo <= hi {
 		if err := ctx.Err(); err != nil {
-			return Movie{}, err
+			return domain.Movie{}, err
 		}
 
 		mid := (lo + hi) / 2
@@ -158,15 +144,15 @@ func (s *Service) GetLastMovie(ctx context.Context) (Movie, error) {
 			found = item
 			foundAny = true
 			lo = mid + 1
-		case errors.Is(err, ErrNotFound):
+		case errors.Is(err, domain.ErrNotFound):
 			hi = mid - 1
 		default:
-			return Movie{}, err
+			return domain.Movie{}, err
 		}
 	}
 
 	if !foundAny {
-		return Movie{}, fmt.Errorf("%w: the stand has no movies", ErrNotFound)
+		return domain.Movie{}, fmt.Errorf("%w: the stand has no movies", domain.ErrNotFound)
 	}
 	return found, nil
 }

@@ -1,4 +1,4 @@
-package api
+package httpapi
 
 import (
 	"context"
@@ -9,19 +9,20 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/khusainovilas/go-spbu-practice/internal/movie"
+	"github.com/khusainovilas/go-spbu-practice/internal/domain"
+	"github.com/khusainovilas/go-spbu-practice/internal/usecase"
 	httpSwagger "github.com/swaggo/http-swagger/v2"
 )
 
-type HTTPHandler struct {
-	service *movie.Service
+type Handler struct {
+	service usecase.MovieUseCase
 }
 
-func NewHTTP(service *movie.Service) *HTTPHandler {
-	return &HTTPHandler{service: service}
+func New(service usecase.MovieUseCase) *Handler {
+	return &Handler{service: service}
 }
 
-func (h *HTTPHandler) Routes() http.Handler {
+func (h *Handler) Routes() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /load-movies", h.loadMovies)
 	mux.HandleFunc("GET /last-movie", h.lastMovie)
@@ -39,8 +40,8 @@ type ErrorResponse struct {
 // @Produce      json
 // @Param        from  query     int  true  "first movie id"
 // @Param        to    query     int  true  "last movie id"
-// @Success      200   {array}   movie.Movie
-// @Success      207   {array}   movie.Movie
+// @Success      200   {array}   domain.Movie
+// @Success      207   {array}   domain.Movie
 // @Header       207   {string}  X-Failed-Ids  "ids that failed"
 // @Failure      400   {object}  ErrorResponse
 // @Failure      404   {object}  ErrorResponse
@@ -48,7 +49,7 @@ type ErrorResponse struct {
 // @Failure      502   {object}  ErrorResponse
 // @Failure      504   {object}  ErrorResponse
 // @Router       /load-movies [get]
-func (h *HTTPHandler) loadMovies(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) loadMovies(w http.ResponseWriter, r *http.Request) {
 	from, err := queryInt(r, "from")
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err)
@@ -83,13 +84,13 @@ func (h *HTTPHandler) loadMovies(w http.ResponseWriter, r *http.Request) {
 // @Summary      Get last movie
 // @Tags         movies
 // @Produce      json
-// @Success      200  {object}  movie.Movie
+// @Success      200  {object}  domain.Movie
 // @Failure      404  {object}  ErrorResponse
 // @Failure      408  {object}  ErrorResponse
 // @Failure      502  {object}  ErrorResponse
 // @Failure      504  {object}  ErrorResponse
 // @Router       /last-movie [get]
-func (h *HTTPHandler) lastMovie(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) lastMovie(w http.ResponseWriter, r *http.Request) {
 	item, err := h.service.GetLastMovie(r.Context())
 	if err != nil {
 		writeError(w, statusForError(err), err)
@@ -122,40 +123,40 @@ func writeError(w http.ResponseWriter, status int, err error) {
 
 func statusForError(err error) int {
 	switch {
-	case errors.Is(err, movie.ErrInvalidRange):
+	case errors.Is(err, domain.ErrInvalidRange):
 		return http.StatusBadRequest
 	case errors.Is(err, context.Canceled):
 		return http.StatusRequestTimeout
 	case errors.Is(err, context.DeadlineExceeded):
 		return http.StatusGatewayTimeout
-	case errors.Is(err, movie.ErrNotFound):
+	case errors.Is(err, domain.ErrNotFound):
 		return http.StatusNotFound
-	case errors.Is(err, movie.ErrUpstream):
+	case errors.Is(err, domain.ErrUpstream):
 		return http.StatusBadGateway
 	default:
 		return http.StatusInternalServerError
 	}
 }
 
-func statusForFailed(failed []movie.FailedMovie) int {
+func statusForFailed(failed []domain.FailedMovie) int {
 	for _, item := range failed {
-		if !errors.Is(item.Err, movie.ErrNotFound) {
+		if !errors.Is(item.Err, domain.ErrNotFound) {
 			return statusForError(item.Err)
 		}
 	}
 	return http.StatusNotFound
 }
 
-func firstFailure(failed []movie.FailedMovie) error {
+func firstFailure(failed []domain.FailedMovie) error {
 	for _, item := range failed {
-		if !errors.Is(item.Err, movie.ErrNotFound) {
+		if !errors.Is(item.Err, domain.ErrNotFound) {
 			return item.Err
 		}
 	}
-	return fmt.Errorf("%w: no movies found in the requested range", movie.ErrNotFound)
+	return fmt.Errorf("%w: no movies found in the requested range", domain.ErrNotFound)
 }
 
-func failedIDs(failed []movie.FailedMovie) string {
+func failedIDs(failed []domain.FailedMovie) string {
 	ids := make([]string, 0, len(failed))
 	for _, item := range failed {
 		ids = append(ids, strconv.Itoa(item.ID))

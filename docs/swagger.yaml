@@ -1,11 +1,6 @@
 basePath: /
 definitions:
-  api.ErrorResponse:
-    properties:
-      error:
-        type: string
-    type: object
-  movie.Movie:
+  domain.Movie:
     properties:
       director:
         type: string
@@ -15,6 +10,11 @@ definitions:
         type: string
       year:
         type: integer
+    type: object
+  httpapi.ErrorResponse:
+    properties:
+      error:
+        type: string
     type: object
 info:
   contact: {}
@@ -30,23 +30,23 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/movie.Movie'
+            $ref: '#/definitions/domain.Movie'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/api.ErrorResponse'
+            $ref: '#/definitions/httpapi.ErrorResponse'
         "408":
           description: Request Timeout
           schema:
-            $ref: '#/definitions/api.ErrorResponse'
+            $ref: '#/definitions/httpapi.ErrorResponse'
         "502":
           description: Bad Gateway
           schema:
-            $ref: '#/definitions/api.ErrorResponse'
+            $ref: '#/definitions/httpapi.ErrorResponse'
         "504":
           description: Gateway Timeout
           schema:
-            $ref: '#/definitions/api.ErrorResponse'
+            $ref: '#/definitions/httpapi.ErrorResponse'
       summary: Get last movie
       tags:
       - movies
@@ -72,7 +72,7 @@ paths:
           description: OK
           schema:
             items:
-              $ref: '#/definitions/movie.Movie'
+              $ref: '#/definitions/domain.Movie'
             type: array
         "207":
           description: Multi-Status
@@ -82,28 +82,28 @@ paths:
               type: string
           schema:
             items:
-              $ref: '#/definitions/movie.Movie'
+              $ref: '#/definitions/domain.Movie'
             type: array
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/api.ErrorResponse'
+            $ref: '#/definitions/httpapi.ErrorResponse'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/api.ErrorResponse'
+            $ref: '#/definitions/httpapi.ErrorResponse'
         "408":
           description: Request Timeout
           schema:
-            $ref: '#/definitions/api.ErrorResponse'
+            $ref: '#/definitions/httpapi.ErrorResponse'
         "502":
           description: Bad Gateway
           schema:
-            $ref: '#/definitions/api.ErrorResponse'
+            $ref: '#/definitions/httpapi.ErrorResponse'
         "504":
           description: Gateway Timeout
           schema:
-            $ref: '#/definitions/api.ErrorResponse'
+            $ref: '#/definitions/httpapi.ErrorResponse'
       summary: Load movies
       tags:
       - movies

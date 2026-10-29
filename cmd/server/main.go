@@ -18,9 +18,10 @@ import (
 
 	moviev1 "github.com/khusainovilas/go-spbu-practice/api/movie/v1"
 	_ "github.com/khusainovilas/go-spbu-practice/docs"
-	"github.com/khusainovilas/go-spbu-practice/internal/api"
-	"github.com/khusainovilas/go-spbu-practice/internal/movie"
-	"github.com/khusainovilas/go-spbu-practice/internal/stand"
+	"github.com/khusainovilas/go-spbu-practice/internal/adapter/stand"
+	"github.com/khusainovilas/go-spbu-practice/internal/handler/grpcapi"
+	"github.com/khusainovilas/go-spbu-practice/internal/handler/httpapi"
+	"github.com/khusainovilas/go-spbu-practice/internal/usecase"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 )
@@ -31,11 +32,11 @@ func main() {
 	grpcAddr := env("GRPC_ADDR", ":9090")
 
 	standClient := stand.NewClient(movieBaseURL, 5*time.Second)
-	movieService := movie.NewService(standClient)
+	movieService := usecase.NewService(standClient)
 
 	httpServer := &http.Server{
 		Addr:    httpAddr,
-		Handler: api.NewHTTP(movieService).Routes(),
+		Handler: httpapi.New(movieService).Routes(),
 	}
 
 	listener, err := net.Listen("tcp", grpcAddr)
@@ -43,7 +44,7 @@ func main() {
 		log.Fatalf("listen gRPC on %s: %v", grpcAddr, err)
 	}
 	grpcServer := grpc.NewServer()
-	moviev1.RegisterMovieServiceServer(grpcServer, api.NewGRPC(movieService))
+	moviev1.RegisterMovieServiceServer(grpcServer, grpcapi.New(movieService))
 	reflection.Register(grpcServer)
 
 	go func() {
