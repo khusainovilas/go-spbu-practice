@@ -1,7 +1,5 @@
 syntax = "proto3";
-
 package movie.v1;
-
 option go_package = "github.com/khusainovilas/go-spbu-practice/api/movie/v1;moviev1";
 
 message Movie {
