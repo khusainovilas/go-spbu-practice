@@ -10,19 +10,16 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-// GRPCServer implements moviev1.MovieServiceServer.
 type GRPCServer struct {
 	moviev1.UnimplementedMovieServiceServer
 
 	service *movie.Service
 }
 
-// NewGRPC creates a gRPC server.
 func NewGRPC(service *movie.Service) *GRPCServer {
 	return &GRPCServer{service: service}
 }
 
-// LoadMovies loads movies with ids in [from; to].
 func (s *GRPCServer) LoadMovies(ctx context.Context, req *moviev1.LoadMoviesRequest) (*moviev1.LoadMoviesResponse, error) {
 	result, err := s.service.LoadMovies(ctx, int(req.GetFrom()), int(req.GetTo()))
 	if err != nil {
@@ -49,7 +46,6 @@ func (s *GRPCServer) LoadMovies(ctx context.Context, req *moviev1.LoadMoviesRequ
 	return response, nil
 }
 
-// GetLastMovie returns the latest movie available on the stand.
 func (s *GRPCServer) GetLastMovie(ctx context.Context, _ *moviev1.GetLastMovieRequest) (*moviev1.Movie, error) {
 	item, err := s.service.GetLastMovie(ctx)
 	if err != nil {
@@ -60,17 +56,13 @@ func (s *GRPCServer) GetLastMovie(ctx context.Context, _ *moviev1.GetLastMovieRe
 
 func toProtoMovie(item movie.Movie) *moviev1.Movie {
 	return &moviev1.Movie{
-		Id:          int32(item.ID),
-		Title:       item.Title,
-		Year:        int32(item.Year),
-		Director:    item.Director,
-		Description: item.Description,
-		Actors:      item.Actors,
-		Genres:      item.Genres,
+		Id:       int32(item.ID),
+		Title:    item.Title,
+		Year:     int32(item.Year),
+		Director: item.Director,
 	}
 }
 
-// grpcStatusForError converts a service error into a gRPC status.
 func grpcStatusForError(err error) error {
 	switch {
 	case errors.Is(err, movie.ErrInvalidRange):
@@ -88,7 +80,6 @@ func grpcStatusForError(err error) error {
 	}
 }
 
-// grpcStatusForFailed returns the status for a range where every movie failed.
 func grpcStatusForFailed(failed []movie.FailedMovie) error {
 	for _, item := range failed {
 		if !errors.Is(item.Err, movie.ErrNotFound) {

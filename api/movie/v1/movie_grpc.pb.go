@@ -26,12 +26,8 @@ const (
 // MovieServiceClient is the client API for MovieService service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
-//
-// MovieService provides access to movies from the external stand.
 type MovieServiceClient interface {
-	// LoadMovies loads movies with ids in [from; to].
 	LoadMovies(ctx context.Context, in *LoadMoviesRequest, opts ...grpc.CallOption) (*LoadMoviesResponse, error)
-	// GetLastMovie finds the latest available movie on the stand.
 	GetLastMovie(ctx context.Context, in *GetLastMovieRequest, opts ...grpc.CallOption) (*Movie, error)
 }
 
@@ -66,12 +62,8 @@ func (c *movieServiceClient) GetLastMovie(ctx context.Context, in *GetLastMovieR
 // MovieServiceServer is the server API for MovieService service.
 // All implementations must embed UnimplementedMovieServiceServer
 // for forward compatibility.
-//
-// MovieService provides access to movies from the external stand.
 type MovieServiceServer interface {
-	// LoadMovies loads movies with ids in [from; to].
 	LoadMovies(context.Context, *LoadMoviesRequest) (*LoadMoviesResponse, error)
-	// GetLastMovie finds the latest available movie on the stand.
 	GetLastMovie(context.Context, *GetLastMovieRequest) (*Movie, error)
 	mustEmbedUnimplementedMovieServiceServer()
 }

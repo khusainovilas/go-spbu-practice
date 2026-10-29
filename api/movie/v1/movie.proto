@@ -4,42 +4,31 @@ package movie.v1;
 
 option go_package = "github.com/khusainovilas/go-spbu-practice/api/movie/v1;moviev1";
 
-// Movie is a movie returned by the external movie stand.
 message Movie {
   int32 id = 1;
   string title = 2;
   int32 year = 3;
   string director = 4;
-  string description = 5;
-  repeated string actors = 6;
-  repeated string genres = 7;
 }
 
-// LoadMoviesRequest defines an inclusive range of movie ids.
 message LoadMoviesRequest {
   int32 from = 1;
   int32 to = 2;
 }
 
-// MovieError describes a failure to load one movie from the range.
 message MovieError {
   int32 id = 1;
   string message = 2;
 }
 
-// LoadMoviesResponse contains loaded movies and per-movie errors.
 message LoadMoviesResponse {
   repeated Movie movies = 1;
   repeated MovieError errors = 2;
 }
 
-// GetLastMovieRequest is empty: the last movie is discovered automatically.
 message GetLastMovieRequest {}
 
-// MovieService provides access to movies from the external stand.
 service MovieService {
-  // LoadMovies loads movies with ids in [from; to].
   rpc LoadMovies(LoadMoviesRequest) returns (LoadMoviesResponse);
-  // GetLastMovie finds the latest available movie on the stand.
   rpc GetLastMovie(GetLastMovieRequest) returns (Movie);
 }

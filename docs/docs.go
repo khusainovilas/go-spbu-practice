@@ -17,14 +17,13 @@ const docTemplate = `{
     "paths": {
         "/last-movie": {
             "get": {
-                "description": "Finds the latest available movie on the stand.",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "movies"
                 ],
-                "summary": "Get the last movie",
+                "summary": "Get last movie",
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -61,25 +60,25 @@ const docTemplate = `{
         },
         "/load-movies": {
             "get": {
-                "description": "Loads movies from the external stand. If some ids fail, the response is 207 with loaded movies and failed ids in the X-Failed-Ids header.",
+                "description": "Loads movies in [from; to]. Partial success is returned as 207 with X-Failed-Ids.",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "movies"
                 ],
-                "summary": "Load movies by id range",
+                "summary": "Load movies",
                 "parameters": [
                     {
                         "type": "integer",
-                        "description": "First movie id (greater than zero)",
+                        "description": "first movie id",
                         "name": "from",
                         "in": "query",
                         "required": true
                     },
                     {
                         "type": "integer",
-                        "description": "Last movie id (not less than from)",
+                        "description": "last movie id",
                         "name": "to",
                         "in": "query",
                         "required": true
@@ -96,7 +95,7 @@ const docTemplate = `{
                         }
                     },
                     "207": {
-                        "description": "Partial success",
+                        "description": "Multi-Status",
                         "schema": {
                             "type": "array",
                             "items": {
@@ -106,7 +105,7 @@ const docTemplate = `{
                         "headers": {
                             "X-Failed-Ids": {
                                 "type": "string",
-                                "description": "Comma-separated movie ids that failed"
+                                "description": "ids that failed"
                             }
                         }
                     },
@@ -149,45 +148,24 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "error": {
-                    "type": "string",
-                    "example": "invalid movie range: from must not be greater than to"
+                    "type": "string"
                 }
             }
         },
         "movie.Movie": {
             "type": "object",
             "properties": {
-                "actors": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "description": {
-                    "type": "string",
-                    "example": "A psychologist visits a space station"
-                },
                 "director": {
-                    "type": "string",
-                    "example": "Andrei Tarkovsky"
-                },
-                "genres": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
+                    "type": "string"
                 },
                 "id": {
-                    "type": "integer",
-                    "example": 1
+                    "type": "integer"
                 },
                 "title": {
-                    "type": "string",
-                    "example": "Solaris"
+                    "type": "string"
                 },
                 "year": {
-                    "type": "integer",
-                    "example": 1972
+                    "type": "integer"
                 }
             }
         }

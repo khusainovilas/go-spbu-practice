@@ -1,4 +1,3 @@
-// Package movie contains the movie model, errors and business logic.
 package movie
 
 import (
@@ -9,77 +8,54 @@ import (
 	"sync"
 )
 
-// defaultWorkers is the number of concurrent requests to the movie stand.
-const defaultWorkers = 8
+const (
+	defaultWorkers   = 8
+	LastMovieProbeID = 99999
+)
 
-// Movie is a movie returned by the external stand.
 type Movie struct {
-	ID          int      `json:"id" example:"1"`
-	Title       string   `json:"title" example:"Solaris"`
-	Year        int      `json:"year" example:"1972"`
-	Director    string   `json:"director" example:"Andrei Tarkovsky"`
-	Description string   `json:"description,omitempty" example:"A psychologist visits a space station"`
-	Actors      []string `json:"actors,omitempty"`
-	Genres      []string `json:"genres,omitempty"`
+	ID       int    `json:"id"`
+	Title    string `json:"title"`
+	Year     int    `json:"year"`
+	Director string `json:"director"`
 }
 
 var (
-	// ErrNotFound means that the requested movie does not exist.
-	ErrNotFound = errors.New("movie not found")
-	// ErrInvalidRange means that the from/to arguments are invalid.
+	ErrNotFound     = errors.New("movie not found")
 	ErrInvalidRange = errors.New("invalid movie range")
-	// ErrUpstream means that the external movie stand returned an error.
-	ErrUpstream = errors.New("movie stand error")
+	ErrUpstream     = errors.New("movie stand error")
 )
 
-// LastMovieProbeID is the maximum movie id according to the stand contract.
-const LastMovieProbeID = 99999
-
-// MovieProvider loads one movie from an external source.
 type MovieProvider interface {
 	GetMovie(ctx context.Context, id int) (Movie, error)
 }
 
-// FailedMovie describes one movie that could not be loaded.
 type FailedMovie struct {
 	ID  int
 	Err error
 }
 
-// LoadResult contains successfully loaded movies and per-movie failures.
 type LoadResult struct {
 	Movies []Movie
 	Failed []FailedMovie
 }
 
-// Service implements the movie business logic.
 type Service struct {
 	provider MovieProvider
 	workers  int
 }
 
-// NewService creates a movie service.
 func NewService(provider MovieProvider) *Service {
-	return &Service{
-		provider: provider,
-		workers:  defaultWorkers,
-	}
+	return &Service{provider: provider, workers: defaultWorkers}
 }
 
-// LoadMovies loads every movie id in [from; to]. If one movie fails, the rest
-// are still loaded and the failure is returned in LoadResult.Failed.
-//
-// A fixed number of workers load the range concurrently. The context cancels
-// all remaining work, and the final slices are sorted by id.
+// LoadMovies loads movies in [from; to] using a small worker pool.
 func (s *Service) LoadMovies(ctx context.Context, from, to int) (LoadResult, error) {
 	if err := validateRange(from, to); err != nil {
 		return LoadResult{}, err
 	}
 
-	result := LoadResult{
-		Movies: make([]Movie, 0),
-		Failed: make([]FailedMovie, 0),
-	}
+	var result LoadResult
 
 	type jobResult struct {
 		id    int
@@ -144,21 +120,19 @@ func (s *Service) LoadMovies(ctx context.Context, from, to int) (LoadResult, err
 }
 
 func validateRange(from, to int) error {
-	switch {
-	case from <= 0:
+	if from <= 0 {
 		return fmt.Errorf("%w: from must be greater than zero", ErrInvalidRange)
-	case to <= 0:
+	}
+	if to <= 0 {
 		return fmt.Errorf("%w: to must be greater than zero", ErrInvalidRange)
-	case from > to:
+	}
+	if from > to {
 		return fmt.Errorf("%w: from must not be greater than to", ErrInvalidRange)
 	}
 	return nil
 }
 
-// GetLastMovie finds the latest available movie on the stand.
-//
-// Movie ids are consecutive from 1 to last_id, and id 99999 is the upper
-// bound. If it does not exist, binary search finds the last existing id.
+// GetLastMovie finds the last movie using the consecutive ids rule.
 func (s *Service) GetLastMovie(ctx context.Context) (Movie, error) {
 	last, err := s.provider.GetMovie(ctx, LastMovieProbeID)
 	if err == nil {

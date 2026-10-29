@@ -21,16 +21,12 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-// Movie is a movie returned by the external movie stand.
 type Movie struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            int32                  `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
 	Title         string                 `protobuf:"bytes,2,opt,name=title,proto3" json:"title,omitempty"`
 	Year          int32                  `protobuf:"varint,3,opt,name=year,proto3" json:"year,omitempty"`
 	Director      string                 `protobuf:"bytes,4,opt,name=director,proto3" json:"director,omitempty"`
-	Description   string                 `protobuf:"bytes,5,opt,name=description,proto3" json:"description,omitempty"`
-	Actors        []string               `protobuf:"bytes,6,rep,name=actors,proto3" json:"actors,omitempty"`
-	Genres        []string               `protobuf:"bytes,7,rep,name=genres,proto3" json:"genres,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -93,28 +89,6 @@ func (x *Movie) GetDirector() string {
 	return ""
 }
 
-func (x *Movie) GetDescription() string {
-	if x != nil {
-		return x.Description
-	}
-	return ""
-}
-
-func (x *Movie) GetActors() []string {
-	if x != nil {
-		return x.Actors
-	}
-	return nil
-}
-
-func (x *Movie) GetGenres() []string {
-	if x != nil {
-		return x.Genres
-	}
-	return nil
-}
-
-// LoadMoviesRequest defines an inclusive range of movie ids.
 type LoadMoviesRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	From          int32                  `protobuf:"varint,1,opt,name=from,proto3" json:"from,omitempty"`
@@ -167,7 +141,6 @@ func (x *LoadMoviesRequest) GetTo() int32 {
 	return 0
 }
 
-// MovieError describes a failure to load one movie from the range.
 type MovieError struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            int32                  `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
@@ -220,7 +193,6 @@ func (x *MovieError) GetMessage() string {
 	return ""
 }
 
-// LoadMoviesResponse contains loaded movies and per-movie errors.
 type LoadMoviesResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Movies        []*Movie               `protobuf:"bytes,1,rep,name=movies,proto3" json:"movies,omitempty"`
@@ -273,7 +245,6 @@ func (x *LoadMoviesResponse) GetErrors() []*MovieError {
 	return nil
 }
 
-// GetLastMovieRequest is empty: the last movie is discovered automatically.
 type GetLastMovieRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	unknownFields protoimpl.UnknownFields
@@ -314,15 +285,12 @@ var File_api_movie_v1_movie_proto protoreflect.FileDescriptor
 
 const file_api_movie_v1_movie_proto_rawDesc = "" +
 	"\n" +
-	"\x18api/movie/v1/movie.proto\x12\bmovie.v1\"\xaf\x01\n" +
+	"\x18api/movie/v1/movie.proto\x12\bmovie.v1\"]\n" +
 	"\x05Movie\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\x05R\x02id\x12\x14\n" +
 	"\x05title\x18\x02 \x01(\tR\x05title\x12\x12\n" +
 	"\x04year\x18\x03 \x01(\x05R\x04year\x12\x1a\n" +
-	"\bdirector\x18\x04 \x01(\tR\bdirector\x12 \n" +
-	"\vdescription\x18\x05 \x01(\tR\vdescription\x12\x16\n" +
-	"\x06actors\x18\x06 \x03(\tR\x06actors\x12\x16\n" +
-	"\x06genres\x18\a \x03(\tR\x06genres\"7\n" +
+	"\bdirector\x18\x04 \x01(\tR\bdirector\"7\n" +
 	"\x11LoadMoviesRequest\x12\x12\n" +
 	"\x04from\x18\x01 \x01(\x05R\x04from\x12\x0e\n" +
 	"\x02to\x18\x02 \x01(\x05R\x02to\"6\n" +

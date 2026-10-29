@@ -3,33 +3,17 @@ definitions:
   api.ErrorResponse:
     properties:
       error:
-        example: 'invalid movie range: from must not be greater than to'
         type: string
     type: object
   movie.Movie:
     properties:
-      actors:
-        items:
-          type: string
-        type: array
-      description:
-        example: A psychologist visits a space station
-        type: string
       director:
-        example: Andrei Tarkovsky
         type: string
-      genres:
-        items:
-          type: string
-        type: array
       id:
-        example: 1
         type: integer
       title:
-        example: Solaris
         type: string
       year:
-        example: 1972
         type: integer
     type: object
 info:
@@ -40,7 +24,6 @@ info:
 paths:
   /last-movie:
     get:
-      description: Finds the latest available movie on the stand.
       produces:
       - application/json
       responses:
@@ -64,20 +47,20 @@ paths:
           description: Gateway Timeout
           schema:
             $ref: '#/definitions/api.ErrorResponse'
-      summary: Get the last movie
+      summary: Get last movie
       tags:
       - movies
   /load-movies:
     get:
-      description: Loads movies from the external stand. If some ids fail, the response
-        is 207 with loaded movies and failed ids in the X-Failed-Ids header.
+      description: Loads movies in [from; to]. Partial success is returned as 207
+        with X-Failed-Ids.
       parameters:
-      - description: First movie id (greater than zero)
+      - description: first movie id
         in: query
         name: from
         required: true
         type: integer
-      - description: Last movie id (not less than from)
+      - description: last movie id
         in: query
         name: to
         required: true
@@ -92,10 +75,10 @@ paths:
               $ref: '#/definitions/movie.Movie'
             type: array
         "207":
-          description: Partial success
+          description: Multi-Status
           headers:
             X-Failed-Ids:
-              description: Comma-separated movie ids that failed
+              description: ids that failed
               type: string
           schema:
             items:
@@ -121,7 +104,7 @@ paths:
           description: Gateway Timeout
           schema:
             $ref: '#/definitions/api.ErrorResponse'
-      summary: Load movies by id range
+      summary: Load movies
       tags:
       - movies
 schemes:

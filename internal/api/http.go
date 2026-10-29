@@ -1,4 +1,3 @@
-// Package api contains the HTTP and gRPC transport layer.
 package api
 
 import (
@@ -14,17 +13,14 @@ import (
 	httpSwagger "github.com/swaggo/http-swagger/v2"
 )
 
-// HTTPHandler serves the movie API over HTTP.
 type HTTPHandler struct {
 	service *movie.Service
 }
 
-// NewHTTP creates an HTTP handler.
 func NewHTTP(service *movie.Service) *HTTPHandler {
 	return &HTTPHandler{service: service}
 }
 
-// Routes registers HTTP routes and Swagger UI.
 func (h *HTTPHandler) Routes() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /load-movies", h.loadMovies)
@@ -33,22 +29,19 @@ func (h *HTTPHandler) Routes() http.Handler {
 	return mux
 }
 
-// ErrorResponse is returned when a request fails.
 type ErrorResponse struct {
-	Error string `json:"error" example:"invalid movie range: from must not be greater than to"`
+	Error string `json:"error"`
 }
 
-// loadMovies loads movies in the inclusive range [from; to].
-//
-// @Summary      Load movies by id range
-// @Description  Loads movies from the external stand. If some ids fail, the response is 207 with loaded movies and failed ids in the X-Failed-Ids header.
+// @Summary      Load movies
+// @Description  Loads movies in [from; to]. Partial success is returned as 207 with X-Failed-Ids.
 // @Tags         movies
 // @Produce      json
-// @Param        from  query     int  true  "First movie id (greater than zero)"
-// @Param        to    query     int  true  "Last movie id (not less than from)"
+// @Param        from  query     int  true  "first movie id"
+// @Param        to    query     int  true  "last movie id"
 // @Success      200   {array}   movie.Movie
-// @Success      207   {array}   movie.Movie  "Partial success"
-// @Header       207   {string}  X-Failed-Ids  "Comma-separated movie ids that failed"
+// @Success      207   {array}   movie.Movie
+// @Header       207   {string}  X-Failed-Ids  "ids that failed"
 // @Failure      400   {object}  ErrorResponse
 // @Failure      404   {object}  ErrorResponse
 // @Failure      408   {object}  ErrorResponse
@@ -87,10 +80,7 @@ func (h *HTTPHandler) loadMovies(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, result.Movies)
 }
 
-// lastMovie returns the latest movie available on the stand.
-//
-// @Summary      Get the last movie
-// @Description  Finds the latest available movie on the stand.
+// @Summary      Get last movie
 // @Tags         movies
 // @Produce      json
 // @Success      200  {object}  movie.Movie
@@ -130,7 +120,6 @@ func writeError(w http.ResponseWriter, status int, err error) {
 	writeJSON(w, status, ErrorResponse{Error: err.Error()})
 }
 
-// statusForError converts a service error into an HTTP status code.
 func statusForError(err error) int {
 	switch {
 	case errors.Is(err, movie.ErrInvalidRange):
@@ -148,7 +137,6 @@ func statusForError(err error) int {
 	}
 }
 
-// statusForFailed returns the status for a range where every movie failed.
 func statusForFailed(failed []movie.FailedMovie) int {
 	for _, item := range failed {
 		if !errors.Is(item.Err, movie.ErrNotFound) {

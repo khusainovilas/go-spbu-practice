@@ -1,8 +1,8 @@
-// @title           Movie Service API
-// @version         1.0
-// @description     HTTP and gRPC API over an external movie stand.
-// @BasePath        /
-// @schemes         http
+// @title       Movie Service API
+// @version     1.0
+// @description HTTP and gRPC API over an external movie stand.
+// @BasePath    /
+// @schemes     http
 package main
 
 import (
@@ -25,30 +25,29 @@ import (
 	"google.golang.org/grpc/reflection"
 )
 
-const requestTimeout = 5 * time.Second
-
 func main() {
-	cfg := loadConfig()
+	movieBaseURL := env("MOVIE_BASE_URL", "https://homeworksite.site")
+	httpAddr := env("HTTP_ADDR", ":8080")
+	grpcAddr := env("GRPC_ADDR", ":9090")
 
-	// Dependency wiring: stand client -> movie service -> HTTP/gRPC.
-	standClient := stand.NewClient(cfg.movieBaseURL, requestTimeout)
+	standClient := stand.NewClient(movieBaseURL, 5*time.Second)
 	movieService := movie.NewService(standClient)
 
 	httpServer := &http.Server{
-		Addr:    cfg.httpAddr,
+		Addr:    httpAddr,
 		Handler: api.NewHTTP(movieService).Routes(),
 	}
 
-	listener, err := net.Listen("tcp", cfg.grpcAddr)
+	listener, err := net.Listen("tcp", grpcAddr)
 	if err != nil {
-		log.Fatalf("listen gRPC on %s: %v", cfg.grpcAddr, err)
+		log.Fatalf("listen gRPC on %s: %v", grpcAddr, err)
 	}
 	grpcServer := grpc.NewServer()
 	moviev1.RegisterMovieServiceServer(grpcServer, api.NewGRPC(movieService))
 	reflection.Register(grpcServer)
 
 	go func() {
-		log.Printf("HTTP server on %s (Swagger: /swagger/index.html), gRPC on %s", cfg.httpAddr, cfg.grpcAddr)
+		log.Printf("HTTP on %s, gRPC on %s", httpAddr, grpcAddr)
 		if err := httpServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			log.Fatalf("HTTP server: %v", err)
 		}
@@ -63,27 +62,10 @@ func main() {
 	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
 	<-stop
 
-	log.Println("shutting down")
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	if err := httpServer.Shutdown(ctx); err != nil {
-		log.Printf("HTTP shutdown: %v", err)
-	}
+	_ = httpServer.Shutdown(ctx)
 	grpcServer.GracefulStop()
-}
-
-type config struct {
-	movieBaseURL string
-	httpAddr     string
-	grpcAddr     string
-}
-
-func loadConfig() config {
-	return config{
-		movieBaseURL: env("MOVIE_BASE_URL", "https://homeworksite.site"),
-		httpAddr:     env("HTTP_ADDR", ":8080"),
-		grpcAddr:     env("GRPC_ADDR", ":9090"),
-	}
 }
 
 func env(name, fallback string) string {
