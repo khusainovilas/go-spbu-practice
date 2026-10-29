@@ -24,7 +24,7 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/domain.Movie"
+                            "$ref": "#/definitions/httpapi.MovieResponse"
                         }
                     },
                     "404": {
@@ -86,7 +86,7 @@
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/domain.Movie"
+                                "$ref": "#/definitions/httpapi.MovieResponse"
                             }
                         }
                     },
@@ -95,7 +95,7 @@
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/domain.Movie"
+                                "$ref": "#/definitions/httpapi.MovieResponse"
                             }
                         },
                         "headers": {
@@ -140,7 +140,15 @@
         }
     },
     "definitions": {
-        "domain.Movie": {
+        "httpapi.ErrorResponse": {
+            "type": "object",
+            "properties": {
+                "error": {
+                    "type": "string"
+                }
+            }
+        },
+        "httpapi.MovieResponse": {
             "type": "object",
             "properties": {
                 "director": {
@@ -154,14 +162,6 @@
                 },
                 "year": {
                     "type": "integer"
-                }
-            }
-        },
-        "httpapi.ErrorResponse": {
-            "type": "object",
-            "properties": {
-                "error": {
-                    "type": "string"
                 }
             }
         }

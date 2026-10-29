@@ -28,7 +28,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/domain.Movie"
+                            "$ref": "#/definitions/httpapi.MovieResponse"
                         }
                     },
                     "404": {
@@ -90,7 +90,7 @@ const docTemplate = `{
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/domain.Movie"
+                                "$ref": "#/definitions/httpapi.MovieResponse"
                             }
                         }
                     },
@@ -99,7 +99,7 @@ const docTemplate = `{
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/domain.Movie"
+                                "$ref": "#/definitions/httpapi.MovieResponse"
                             }
                         },
                         "headers": {
@@ -144,7 +144,15 @@ const docTemplate = `{
         }
     },
     "definitions": {
-        "domain.Movie": {
+        "httpapi.ErrorResponse": {
+            "type": "object",
+            "properties": {
+                "error": {
+                    "type": "string"
+                }
+            }
+        },
+        "httpapi.MovieResponse": {
             "type": "object",
             "properties": {
                 "director": {
@@ -158,14 +166,6 @@ const docTemplate = `{
                 },
                 "year": {
                     "type": "integer"
-                }
-            }
-        },
-        "httpapi.ErrorResponse": {
-            "type": "object",
-            "properties": {
-                "error": {
-                    "type": "string"
                 }
             }
         }

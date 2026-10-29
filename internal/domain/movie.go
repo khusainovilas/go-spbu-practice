@@ -3,10 +3,10 @@ package domain
 import "errors"
 
 type Movie struct {
-	ID       int    `json:"id"`
-	Title    string `json:"title"`
-	Year     int    `json:"year"`
-	Director string `json:"director"`
+	ID       int
+	Title    string
+	Year     int
+	Director string
 }
 
 var (

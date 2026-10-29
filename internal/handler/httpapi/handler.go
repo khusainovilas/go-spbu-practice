@@ -34,14 +34,38 @@ type ErrorResponse struct {
 	Error string `json:"error"`
 }
 
+type MovieResponse struct {
+	ID       int    `json:"id"`
+	Title    string `json:"title"`
+	Year     int    `json:"year"`
+	Director string `json:"director"`
+}
+
+func toResponse(item domain.Movie) MovieResponse {
+	return MovieResponse{
+		ID:       item.ID,
+		Title:    item.Title,
+		Year:     item.Year,
+		Director: item.Director,
+	}
+}
+
+func toResponses(items []domain.Movie) []MovieResponse {
+	out := make([]MovieResponse, 0, len(items))
+	for _, item := range items {
+		out = append(out, toResponse(item))
+	}
+	return out
+}
+
 // @Summary      Load movies
 // @Description  Loads movies in [from; to]. Partial success is returned as 207 with X-Failed-Ids.
 // @Tags         movies
 // @Produce      json
 // @Param        from  query     int  true  "first movie id"
 // @Param        to    query     int  true  "last movie id"
-// @Success      200   {array}   domain.Movie
-// @Success      207   {array}   domain.Movie
+// @Success      200   {array}   MovieResponse
+// @Success      207   {array}   MovieResponse
 // @Header       207   {string}  X-Failed-Ids  "ids that failed"
 // @Failure      400   {object}  ErrorResponse
 // @Failure      404   {object}  ErrorResponse
@@ -74,17 +98,17 @@ func (h *Handler) loadMovies(w http.ResponseWriter, r *http.Request) {
 
 	if len(result.Failed) > 0 {
 		w.Header().Set("X-Failed-Ids", failedIDs(result.Failed))
-		writeJSON(w, http.StatusMultiStatus, result.Movies)
+		writeJSON(w, http.StatusMultiStatus, toResponses(result.Movies))
 		return
 	}
 
-	writeJSON(w, http.StatusOK, result.Movies)
+	writeJSON(w, http.StatusOK, toResponses(result.Movies))
 }
 
 // @Summary      Get last movie
 // @Tags         movies
 // @Produce      json
-// @Success      200  {object}  domain.Movie
+// @Success      200  {object}  MovieResponse
 // @Failure      404  {object}  ErrorResponse
 // @Failure      408  {object}  ErrorResponse
 // @Failure      502  {object}  ErrorResponse
@@ -96,7 +120,7 @@ func (h *Handler) lastMovie(w http.ResponseWriter, r *http.Request) {
 		writeError(w, statusForError(err), err)
 		return
 	}
-	writeJSON(w, http.StatusOK, item)
+	writeJSON(w, http.StatusOK, toResponse(item))
 }
 
 func queryInt(r *http.Request, name string) (int, error) {

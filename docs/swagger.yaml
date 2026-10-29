@@ -1,6 +1,11 @@
 basePath: /
 definitions:
-  domain.Movie:
+  httpapi.ErrorResponse:
+    properties:
+      error:
+        type: string
+    type: object
+  httpapi.MovieResponse:
     properties:
       director:
         type: string
@@ -10,11 +15,6 @@ definitions:
         type: string
       year:
         type: integer
-    type: object
-  httpapi.ErrorResponse:
-    properties:
-      error:
-        type: string
     type: object
 info:
   contact: {}
@@ -30,7 +30,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/domain.Movie'
+            $ref: '#/definitions/httpapi.MovieResponse'
         "404":
           description: Not Found
           schema:
@@ -72,7 +72,7 @@ paths:
           description: OK
           schema:
             items:
-              $ref: '#/definitions/domain.Movie'
+              $ref: '#/definitions/httpapi.MovieResponse'
             type: array
         "207":
           description: Multi-Status
@@ -82,7 +82,7 @@ paths:
               type: string
           schema:
             items:
-              $ref: '#/definitions/domain.Movie'
+              $ref: '#/definitions/httpapi.MovieResponse'
             type: array
         "400":
           description: Bad Request
