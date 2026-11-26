@@ -1,0 +1,32 @@
+syntax = "proto3";
+package movie.v1;
+option go_package = "github.com/khusainovilas/go-spbu-practice/api/movie/v1;moviev1";
+
+message Movie {
+  int32 id = 1;
+  string title = 2;
+  int32 year = 3;
+  string director = 4;
+}
+
+message LoadMoviesRequest {
+  int32 from = 1;
+  int32 to = 2;
+}
+
+message MovieError {
+  int32 id = 1;
+  string message = 2;
+}
+
+message LoadMoviesResponse {
+  repeated Movie movies = 1;
+  repeated MovieError errors = 2;
+}
+
+message GetLastMovieRequest {}
+
+service MovieService {
+  rpc LoadMovies(LoadMoviesRequest) returns (LoadMoviesResponse);
+  rpc GetLastMovie(GetLastMovieRequest) returns (Movie);
+}
