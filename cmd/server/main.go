@@ -1,6 +1,6 @@
 // @title       Movie Service API
 // @version     1.0
-// @description HTTP and gRPC API over an external movie stand.
+// @description HTTP and gRPC API backed by PostgreSQL with Redis search.
 // @BasePath    /
 // @schemes     http
 package main
@@ -19,6 +19,7 @@ import (
 	moviev1 "github.com/khusainovilas/go-spbu-practice/api/movie/v1"
 	_ "github.com/khusainovilas/go-spbu-practice/docs"
 	"github.com/khusainovilas/go-spbu-practice/internal/adapter/postgres"
+	redisstore "github.com/khusainovilas/go-spbu-practice/internal/adapter/redis"
 	"github.com/khusainovilas/go-spbu-practice/internal/adapter/stand"
 	"github.com/khusainovilas/go-spbu-practice/internal/handler/grpcapi"
 	"github.com/khusainovilas/go-spbu-practice/internal/handler/httpapi"
@@ -35,6 +36,10 @@ func main() {
 	if databaseURL == "" {
 		log.Fatal("DATABASE_URL is required")
 	}
+	redisAddr := os.Getenv("REDIS_ADDR")
+	if redisAddr == "" {
+		log.Fatal("REDIS_ADDR is required")
+	}
 
 	startupCtx, cancelStartup := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancelStartup()
@@ -49,17 +54,26 @@ func main() {
 		log.Fatalf("apply migrations: %v", err)
 	}
 
+	redisClient, err := redisstore.Open(startupCtx, redisAddr)
+	if err != nil {
+		log.Fatalf("connect to Redis: %v", err)
+	}
+	defer redisClient.Close()
+
 	standClient := stand.NewClient(movieBaseURL, 5*time.Second)
-	movieService := usecase.NewService(standClient, postgres.NewRepository(pool))
+	movieService := usecase.NewService(standClient, postgres.NewRepository(pool), redisClient)
 
 	if err := movieService.Sync(startupCtx); err != nil {
 		log.Fatalf("sync movies: %v", err)
+	}
+	if err := movieService.RebuildSearchIndex(startupCtx); err != nil {
+		log.Fatalf("build search index: %v", err)
 	}
 	cancelStartup()
 
 	httpServer := &http.Server{
 		Addr:    httpAddr,
-		Handler: httpapi.New(movieService).Routes(),
+		Handler: httpapi.New(movieService, redisClient).Routes(),
 	}
 
 	listener, err := net.Listen("tcp", grpcAddr)

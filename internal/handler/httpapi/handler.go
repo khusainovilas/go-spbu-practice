@@ -14,18 +14,25 @@ import (
 	httpSwagger "github.com/swaggo/http-swagger/v2"
 )
 
-type Handler struct {
-	service usecase.MovieUseCase
+type SearchCache interface {
+	GetCached(ctx context.Context, query string) (string, bool, error)
+	SetCached(ctx context.Context, query, value string) error
 }
 
-func New(service usecase.MovieUseCase) *Handler {
-	return &Handler{service: service}
+type Handler struct {
+	service usecase.MovieUseCase
+	cache   SearchCache
+}
+
+func New(service usecase.MovieUseCase, cache SearchCache) *Handler {
+	return &Handler{service: service, cache: cache}
 }
 
 func (h *Handler) Routes() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /load-movies", h.loadMovies)
 	mux.HandleFunc("GET /last-movie", h.lastMovie)
+	mux.HandleFunc("GET /search", h.search)
 	mux.Handle("GET /swagger/", httpSwagger.Handler(httpSwagger.URL("/swagger/doc.json")))
 	return mux
 }
@@ -123,6 +130,47 @@ func (h *Handler) lastMovie(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, toResponse(item))
 }
 
+// @Summary      Search movies
+// @Description  Searches movies by words from title and director. Multiple words are combined with AND.
+// @Tags         movies
+// @Produce      json
+// @Param        q  query     string  true  "search query"
+// @Success      200  {array}   MovieResponse
+// @Failure      400  {object}  ErrorResponse
+// @Failure      500  {object}  ErrorResponse
+// @Router       /search [get]
+func (h *Handler) search(w http.ResponseWriter, r *http.Request) {
+	query := strings.TrimSpace(r.URL.Query().Get("q"))
+	if query == "" {
+		writeError(w, http.StatusBadRequest, fmt.Errorf("query parameter %q is required", "q"))
+		return
+	}
+
+	cached, ok, err := h.cache.GetCached(r.Context(), query)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	if ok {
+		writeRawJSON(w, http.StatusOK, cached)
+		return
+	}
+
+	movies, err := h.service.Search(r.Context(), query)
+	if err != nil {
+		writeError(w, statusForError(err), err)
+		return
+	}
+
+	body, err := json.Marshal(toResponses(movies))
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	_ = h.cache.SetCached(r.Context(), query, string(body))
+	writeRawJSON(w, http.StatusOK, string(body))
+}
+
 func queryInt(r *http.Request, name string) (int, error) {
 	raw := strings.TrimSpace(r.URL.Query().Get(name))
 	if raw == "" {
@@ -139,6 +187,12 @@ func writeJSON(w http.ResponseWriter, status int, value any) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(value)
+}
+
+func writeRawJSON(w http.ResponseWriter, status int, body string) {
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.WriteHeader(status)
+	_, _ = w.Write([]byte(body))
 }
 
 func writeError(w http.ResponseWriter, status int, err error) {

@@ -4,7 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"regexp"
 	"sort"
+	"strings"
 	"sync"
 
 	"github.com/khusainovilas/go-spbu-practice/internal/domain"
@@ -22,23 +24,31 @@ type MovieProvider interface {
 type MovieRepository interface {
 	GetLast(ctx context.Context) (domain.Movie, error)
 	ListRange(ctx context.Context, from, to int) ([]domain.Movie, error)
+	ListByIDs(ctx context.Context, ids []int) ([]domain.Movie, error)
 	ListIDs(ctx context.Context) ([]int, error)
 	Upsert(ctx context.Context, movie domain.Movie) error
+}
+
+type SearchStore interface {
+	ReplaceIndex(ctx context.Context, index map[string][]int) error
+	FindIDs(ctx context.Context, words []string) ([]int, error)
 }
 
 type MovieUseCase interface {
 	LoadMovies(ctx context.Context, from, to int) (domain.LoadResult, error)
 	GetLastMovie(ctx context.Context) (domain.Movie, error)
+	Search(ctx context.Context, query string) ([]domain.Movie, error)
 }
 
 type Service struct {
 	provider   MovieProvider
 	repository MovieRepository
+	search     SearchStore
 	workers    int
 }
 
-func NewService(provider MovieProvider, repository MovieRepository) *Service {
-	return &Service{provider: provider, repository: repository, workers: defaultWorkers}
+func NewService(provider MovieProvider, repository MovieRepository, search SearchStore) *Service {
+	return &Service{provider: provider, repository: repository, search: search, workers: defaultWorkers}
 }
 
 var _ MovieUseCase = (*Service)(nil)
@@ -121,6 +131,49 @@ func (s *Service) Sync(ctx context.Context) error {
 		}
 	}
 	return nil
+}
+
+// RebuildSearchIndex rebuilds the Redis index from all movies in PostgreSQL.
+func (s *Service) RebuildSearchIndex(ctx context.Context) error {
+	ids, err := s.repository.ListIDs(ctx)
+	if err != nil {
+		return err
+	}
+	movies, err := s.repository.ListByIDs(ctx, ids)
+	if err != nil {
+		return err
+	}
+
+	index := make(map[string][]int)
+	for _, movie := range movies {
+		for _, word := range searchWords(movie.Title + " " + movie.Director) {
+			index[word] = append(index[word], movie.ID)
+		}
+	}
+	return s.search.ReplaceIndex(ctx, index)
+}
+
+// Search finds movie ids in Redis and loads the movies from PostgreSQL.
+func (s *Service) Search(ctx context.Context, query string) ([]domain.Movie, error) {
+	words := searchWords(query)
+	if len(words) == 0 {
+		return []domain.Movie{}, nil
+	}
+
+	ids, err := s.search.FindIDs(ctx, words)
+	if err != nil {
+		return nil, err
+	}
+	if len(ids) == 0 {
+		return []domain.Movie{}, nil
+	}
+	return s.repository.ListByIDs(ctx, ids)
+}
+
+var searchWordPattern = regexp.MustCompile(`[\p{L}\p{N}]+`)
+
+func searchWords(text string) []string {
+	return searchWordPattern.FindAllString(strings.ToLower(text), -1)
 }
 
 // fetchMovies loads the given movie ids from the stand using a small worker pool.
