@@ -18,6 +18,7 @@ import (
 
 	moviev1 "github.com/khusainovilas/go-spbu-practice/api/movie/v1"
 	_ "github.com/khusainovilas/go-spbu-practice/docs"
+	"github.com/khusainovilas/go-spbu-practice/internal/adapter/postgres"
 	"github.com/khusainovilas/go-spbu-practice/internal/adapter/stand"
 	"github.com/khusainovilas/go-spbu-practice/internal/handler/grpcapi"
 	"github.com/khusainovilas/go-spbu-practice/internal/handler/httpapi"
@@ -30,9 +31,31 @@ func main() {
 	movieBaseURL := env("MOVIE_BASE_URL", "https://homeworksite.site")
 	httpAddr := env("HTTP_ADDR", ":8080")
 	grpcAddr := env("GRPC_ADDR", ":9090")
+	databaseURL := os.Getenv("DATABASE_URL")
+	if databaseURL == "" {
+		log.Fatal("DATABASE_URL is required")
+	}
+
+	startupCtx, cancelStartup := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancelStartup()
+
+	pool, err := postgres.Open(startupCtx, databaseURL)
+	if err != nil {
+		log.Fatalf("connect to PostgreSQL: %v", err)
+	}
+	defer pool.Close()
+
+	if err := postgres.ApplyMigrations(startupCtx, pool); err != nil {
+		log.Fatalf("apply migrations: %v", err)
+	}
 
 	standClient := stand.NewClient(movieBaseURL, 5*time.Second)
-	movieService := usecase.NewService(standClient)
+	movieService := usecase.NewService(standClient, postgres.NewRepository(pool))
+
+	if err := movieService.Sync(startupCtx); err != nil {
+		log.Fatalf("sync movies: %v", err)
+	}
+	cancelStartup()
 
 	httpServer := &http.Server{
 		Addr:    httpAddr,

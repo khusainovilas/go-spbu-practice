@@ -52,6 +52,8 @@ func (c *Client) GetMovie(ctx context.Context, id int) (domain.Movie, error) {
 	if err := json.NewDecoder(resp.Body).Decode(&item); err != nil {
 		return domain.Movie{}, fmt.Errorf("%w: decode movie %d: %v", domain.ErrUpstream, id, err)
 	}
-	item.ID = id
+	if item.ID == 0 {
+		item.ID = id
+	}
 	return item, nil
 }
